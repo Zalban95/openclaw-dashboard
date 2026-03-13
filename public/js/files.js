@@ -1,0 +1,443 @@
+/* ═══════════════════════════════════════════════════════
+   OPENCLAW PANEL — FILE MANAGER
+   ═══════════════════════════════════════════════════════ */
+
+/* ── State ───────────────────────────────────────────── */
+const fm = {
+  cwd:       '/home/al',
+  entries:   [],
+  selected:  new Set(),
+  clipboard: null,   // { op: 'copy'|'cut', paths: [] }
+  sortBy:    'name',
+  sortAsc:   true,
+  editFile:  null,   // path of open inline editor
+  renaming:  null,   // path currently being renamed
+};
+
+/* ── Bookmarks ───────────────────────────────────────── */
+const FM_BOOKMARKS = [
+  { id: 'home',      icon: '⌂', label: 'Home',          path: '/home/al' },
+  { id: 'openclaw',  icon: '⚙', label: '.openclaw',      path: '/home/al/.openclaw' },
+  { id: 'workspace', icon: '📁', label: 'Workspace',      path: '/home/al/.openclaw/workspace' },
+  { id: 'skills',    icon: '🔌', label: 'Skills',         path: '/home/al/.openclaw/workspace/skills' },
+  { id: 'compose',   icon: '🐳', label: 'Docker dir',     path: '/home/al/openclaw' },
+  { id: 'newvolume', icon: '💾', label: 'NewVolume',      path: '/media/al/NewVolume' },
+  { id: 'snapshots', icon: '📷', label: 'Snapshots',      path: '/media/al/NewVolume/openclaw-snapshots' },
+  { id: 'ollama',    icon: '🧠', label: 'Ollama models',  path: '/media/al/NewVolume/ollama-models' },
+  { id: 'scripts',   icon: '⚡', label: 'Scripts',        path: '/home/al' },
+  { id: 'root',      icon: '/', label: 'Root fs',         path: '/' },
+];
+
+/* ── Init ────────────────────────────────────────────── */
+function fmInit() {
+  if (document.getElementById('fm-bookmarks-list').children.length > 0) {
+    fmRefresh(); return;
+  }
+  fmBuildBookmarks();
+  fmNavigate(fm.cwd);
+}
+
+function fmBuildBookmarks() {
+  const ul = document.getElementById('fm-bookmarks-list');
+  FM_BOOKMARKS.forEach(b => {
+    const btn     = document.createElement('button');
+    btn.className = 'fm-bookmark';
+    btn.id        = `fmbk-${b.id}`;
+    btn.title     = b.path;
+    btn.innerHTML = `<span class="fm-bookmark-icon">${b.icon}</span>
+                     <span class="fm-bookmark-name">${b.label}</span>`;
+    btn.onclick   = () => fmNavigate(b.path);
+    ul.appendChild(btn);
+  });
+}
+
+function fmUpdateBookmarkActive() {
+  document.querySelectorAll('.fm-bookmark').forEach(b => b.classList.remove('active'));
+  const match = FM_BOOKMARKS.find(b => fm.cwd === b.path);
+  if (match) document.getElementById(`fmbk-${match.id}`)?.classList.add('active');
+}
+
+/* ── Navigate ────────────────────────────────────────── */
+async function fmNavigate(path) {
+  fm.cwd      = path;
+  fm.selected = new Set();
+  fm.renaming = null;
+  fmUpdateBookmarkActive();
+  fmRenderBreadcrumb();
+  document.getElementById('fm-path-input').value = path;
+  await fmRefresh();
+}
+
+async function fmRefresh() {
+  const list = document.getElementById('fm-list-inner');
+  list.innerHTML = '<div class="placeholder pulse" style="padding:16px">Loading…</div>';
+  try {
+    const data    = await apiFetch(`/api/files/list?path=${encodeURIComponent(fm.cwd)}`);
+    fm.entries    = data.entries || [];
+    fmRenderList();
+  } catch (e) {
+    list.innerHTML = `<div class="placeholder" style="padding:16px;color:var(--red)">${e.message}</div>`;
+  }
+  fmUpdateStatus();
+}
+
+/* ── Breadcrumb ──────────────────────────────────────── */
+function fmRenderBreadcrumb() {
+  const bc   = document.getElementById('fm-breadcrumb');
+  const parts = fm.cwd.replace(/\/$/, '').split('/').filter((p, i) => i === 0 || p);
+  bc.innerHTML = '';
+
+  let accumulated = '';
+  parts.forEach((part, idx) => {
+    accumulated = idx === 0 ? '/' : `${accumulated}/${part}`;
+    const seg = accumulated;
+
+    if (idx > 0) {
+      const sep  = document.createElement('span');
+      sep.className = 'fm-bc-sep'; sep.textContent = '/';
+      bc.appendChild(sep);
+    }
+    const btn       = document.createElement('button');
+    btn.className   = 'fm-bc-part';
+    btn.textContent = part === '' ? '/' : part;
+    btn.onclick     = () => fmNavigate(seg);
+    bc.appendChild(btn);
+  });
+}
+
+/* ── Render file list ────────────────────────────────── */
+function fmRenderList() {
+  const container = document.getElementById('fm-list-inner');
+
+  let entries = [...fm.entries];
+
+  // Sort
+  entries.sort((a, b) => {
+    if (a.isDir !== b.isDir) return a.isDir ? -1 : 1; // dirs first
+    let va = a[fm.sortBy] || '', vb = b[fm.sortBy] || '';
+    if (fm.sortBy === 'size') { va = a.size || 0; vb = b.size || 0; }
+    const cmp = typeof va === 'number' ? va - vb : va.localeCompare(vb);
+    return fm.sortAsc ? cmp : -cmp;
+  });
+
+  if (!entries.length) {
+    container.innerHTML = `<div class="fm-empty"><div class="fm-empty-icon">📂</div><span>Empty directory</span></div>`;
+    return;
+  }
+
+  const rows = entries.map(e => fmRowHTML(e)).join('');
+  container.innerHTML = rows;
+}
+
+function fmRowHTML(e) {
+  const path     = `${fm.cwd}/${e.name}`.replace('//', '/');
+  const isCut    = fm.clipboard?.op === 'cut' && fm.clipboard.paths.includes(path);
+  const selected = fm.selected.has(path);
+  const icon     = e.isDir ? '📁' : fmFileIcon(e.name);
+  const size     = e.isDir ? '—' : fmFmtSize(e.size);
+  const date     = e.mtime ? fmShortDate(e.mtime) : '—';
+
+  return `<div class="fm-row ${e.isDir ? 'dir' : ''} ${selected ? 'selected' : ''} ${isCut ? 'cut' : ''}"
+               data-path="${path}" data-name="${e.name}" data-isdir="${e.isDir}"
+               onclick="fmClickRow(event, '${path}', ${e.isDir})"
+               ondblclick="fmDblClick('${path}', ${e.isDir})"
+               oncontextmenu="fmContextMenu(event, '${path}', ${e.isDir})">
+    <span class="fm-icon">${icon}</span>
+    <span class="fm-name" title="${e.name}">${e.name}</span>
+    <span class="fm-size">${size}</span>
+    <span class="fm-date">${date}</span>
+    <span class="fm-acts">
+      ${e.isDir ? '' : `<button class="btn btn-xs" title="Edit" onclick="fmOpenEditor('${path}', event)">✏</button>`}
+      <button class="btn btn-xs" title="Rename" onclick="fmRenameInline('${path}', '${e.name}', event)">↩</button>
+      <button class="btn btn-xs btn-red" title="Delete" onclick="fmDelete('${path}', ${e.isDir}, event)">✕</button>
+    </span>
+  </div>`;
+}
+
+/* ── Row interactions ────────────────────────────────── */
+function fmClickRow(event, path, isDir) {
+  if (event.ctrlKey || event.metaKey) {
+    fm.selected.has(path) ? fm.selected.delete(path) : fm.selected.add(path);
+  } else if (event.shiftKey) {
+    // range select
+    const rows = Array.from(document.querySelectorAll('.fm-row'));
+    const idx  = rows.findIndex(r => r.dataset.path === path);
+    const lastSelected = [...fm.selected];
+    if (lastSelected.length) {
+      const lastPath = lastSelected[lastSelected.length - 1];
+      const lastIdx  = rows.findIndex(r => r.dataset.path === lastPath);
+      const [lo, hi] = [Math.min(idx, lastIdx), Math.max(idx, lastIdx)];
+      rows.slice(lo, hi + 1).forEach(r => fm.selected.add(r.dataset.path));
+    } else {
+      fm.selected.add(path);
+    }
+  } else {
+    fm.selected = new Set([path]);
+  }
+  fmRenderList();
+  fmUpdateStatus();
+}
+
+function fmDblClick(path, isDir) {
+  if (isDir) fmNavigate(path);
+  else fmOpenEditor(path);
+}
+
+/* ── Context menu (keyboard shortcuts hint) ──────────── */
+function fmContextMenu(event, path, isDir) {
+  event.preventDefault();
+  if (!fm.selected.has(path)) fm.selected = new Set([path]);
+  fmRenderList();
+  // Simple action modal instead of native context menu
+  const acts = [
+    { label: isDir ? '→ Open' : '✏ Edit',    fn: () => isDir ? fmNavigate(path) : fmOpenEditor(path) },
+    { label: '⧉ Copy',    fn: () => fmCopy() },
+    { label: '✂ Cut',     fn: () => fmCut() },
+    { label: '↩ Rename',  fn: () => fmRenameInline(path, path.split('/').pop()) },
+    { label: '✕ Delete',  fn: () => fmDelete(path, isDir) },
+  ];
+  showContextModal(event.clientX, event.clientY, acts);
+}
+
+function showContextModal(x, y, actions) {
+  removeContextModal();
+  const menu = document.createElement('div');
+  menu.id = 'fm-ctx-menu';
+  menu.style.cssText = `position:fixed;left:${x}px;top:${y}px;z-index:9999;
+    background:var(--raised);border:1px solid var(--border2);min-width:140px;
+    box-shadow:0 4px 20px rgba(0,0,0,0.5)`;
+  actions.forEach(a => {
+    const btn = document.createElement('button');
+    btn.style.cssText = `display:block;width:100%;padding:7px 14px;text-align:left;
+      background:transparent;border:none;color:var(--text);font-family:inherit;
+      font-size:11px;cursor:pointer;border-bottom:1px solid var(--border);`;
+    btn.textContent = a.label;
+    btn.onmouseenter = () => btn.style.background = 'var(--dim)';
+    btn.onmouseleave = () => btn.style.background = 'transparent';
+    btn.onclick      = () => { removeContextModal(); a.fn(); };
+    menu.appendChild(btn);
+  });
+  document.body.appendChild(menu);
+  setTimeout(() => document.addEventListener('click', removeContextModal, { once: true }), 50);
+}
+
+function removeContextModal() {
+  document.getElementById('fm-ctx-menu')?.remove();
+}
+
+/* ── Clipboard operations ────────────────────────────── */
+function fmCopy() {
+  const paths = fm.selected.size ? [...fm.selected] : [];
+  if (!paths.length) return;
+  fm.clipboard = { op: 'copy', paths };
+  fmUpdateStatus();
+  fmRenderList();
+}
+
+function fmCut() {
+  const paths = fm.selected.size ? [...fm.selected] : [];
+  if (!paths.length) return;
+  fm.clipboard = { op: 'cut', paths };
+  fmUpdateStatus();
+  fmRenderList();
+}
+
+async function fmPaste() {
+  if (!fm.clipboard?.paths.length) return;
+  const { op, paths } = fm.clipboard;
+  try {
+    await apiFetch('/api/files/paste', {
+      method: 'POST',
+      body: { op, paths, dest: fm.cwd }
+    });
+    if (op === 'cut') fm.clipboard = null;
+    fmRefresh();
+  } catch (e) { alert(`Paste error: ${e.message}`); }
+}
+
+/* ── Delete ──────────────────────────────────────────── */
+async function fmDelete(path, isDir, evt) {
+  if (evt) evt.stopPropagation();
+  const targets = fm.selected.size > 1 ? [...fm.selected] : [path];
+  if (!confirm(`Delete ${targets.length} item(s)?`)) return;
+  try {
+    await apiFetch('/api/files/delete', { method: 'POST', body: { paths: targets } });
+    fm.selected = new Set();
+    fmRefresh();
+  } catch (e) { alert(`Delete error: ${e.message}`); }
+}
+
+/* ── Rename (inline) ─────────────────────────────────── */
+function fmRenameInline(path, name, evt) {
+  if (evt) evt.stopPropagation();
+  const rows = document.querySelectorAll('.fm-row');
+  const row  = Array.from(rows).find(r => r.dataset.path === path);
+  if (!row) return;
+
+  const nameEl = row.querySelector('.fm-name');
+  const orig   = nameEl.textContent;
+  nameEl.innerHTML = '';
+
+  const input       = document.createElement('input');
+  input.className   = 'fm-rename-input';
+  input.value       = name;
+  nameEl.appendChild(input);
+  input.focus();
+  input.select();
+
+  const doRename = async () => {
+    const newName = input.value.trim();
+    if (!newName || newName === name) { fmRenderList(); return; }
+    const dir     = path.substring(0, path.lastIndexOf('/'));
+    const newPath = `${dir}/${newName}`;
+    try {
+      await apiFetch('/api/files/rename', { method: 'POST', body: { from: path, to: newPath } });
+      fmRefresh();
+    } catch (e) { alert(`Rename error: ${e.message}`); fmRenderList(); }
+  };
+
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter')  { e.preventDefault(); doRename(); }
+    if (e.key === 'Escape') { fmRenderList(); }
+  });
+  input.addEventListener('blur', doRename);
+}
+
+/* ── Create new folder ───────────────────────────────── */
+async function fmNewFolder() {
+  const name = prompt('New folder name:');
+  if (!name) return;
+  try {
+    await apiFetch('/api/files/mkdir', { method: 'POST', body: { path: `${fm.cwd}/${name}` } });
+    fmRefresh();
+  } catch (e) { alert(`Error: ${e.message}`); }
+}
+
+/* ── Create new file ─────────────────────────────────── */
+async function fmNewFile() {
+  const name = prompt('New file name:');
+  if (!name) return;
+  const path = `${fm.cwd}/${name}`;
+  try {
+    await apiFetch('/api/files/write', { method: 'POST', body: { path, content: '' } });
+    fmRefresh();
+    fmOpenEditor(path);
+  } catch (e) { alert(`Error: ${e.message}`); }
+}
+
+/* ── Inline text editor ──────────────────────────────── */
+async function fmOpenEditor(path, evt) {
+  if (evt) evt.stopPropagation();
+  const panel = document.getElementById('fm-editor-panel');
+  const fname = document.getElementById('fm-editor-filename');
+  const editor = document.getElementById('fm-editor');
+
+  fname.textContent = path;
+  fm.editFile       = path;
+  panel.style.display = 'flex';
+
+  try {
+    const data  = await apiFetch(`/api/files/read?path=${encodeURIComponent(path)}`);
+    editor.value = data.content;
+    editor.focus();
+  } catch (e) { editor.value = `// Error: ${e.message}`; }
+}
+
+function fmCloseEditor() {
+  document.getElementById('fm-editor-panel').style.display = 'none';
+  fm.editFile = null;
+}
+
+async function fmSaveEditor() {
+  if (!fm.editFile) return;
+  const content = document.getElementById('fm-editor').value;
+  const status  = document.getElementById('fm-editor-status');
+  try {
+    await apiFetch('/api/files/write', { method: 'POST', body: { path: fm.editFile, content } });
+    setStatus(status, '✓ Saved', 'ok');
+    setTimeout(() => setStatus(status, ''), 3000);
+  } catch (e) { setStatus(status, `✗ ${e.message}`, 'err'); }
+}
+
+/* ── Path input ──────────────────────────────────────── */
+function fmGoPath(evt) {
+  if (evt.key === 'Enter') {
+    fmNavigate(document.getElementById('fm-path-input').value.trim());
+  }
+}
+
+/* ── Status bar ──────────────────────────────────────── */
+function fmUpdateStatus() {
+  const bar  = document.getElementById('fm-statusbar-text');
+  const clip = document.getElementById('fm-statusbar-clip');
+  const total = fm.entries.length;
+  const selN  = fm.selected.size;
+  bar.textContent = selN > 0 ? `${selN} selected of ${total} items` : `${total} items`;
+  if (fm.clipboard) {
+    clip.textContent = `${fm.clipboard.op === 'cut' ? '✂' : '⧉'} ${fm.clipboard.paths.length} in clipboard`;
+    clip.className   = 'fm-clipboard-info';
+  } else {
+    clip.textContent = '';
+  }
+}
+
+/* ── Sort ────────────────────────────────────────────── */
+function fmSort(by) {
+  if (fm.sortBy === by) fm.sortAsc = !fm.sortAsc;
+  else { fm.sortBy = by; fm.sortAsc = true; }
+  document.querySelectorAll('.fm-col-h').forEach(h => {
+    h.classList.toggle('sorted', h.dataset.sort === by);
+  });
+  fmRenderList();
+}
+
+/* ── Keyboard shortcuts ──────────────────────────────── */
+document.addEventListener('keydown', e => {
+  if (currentTab !== 'files') return;
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  if ((e.ctrlKey || e.metaKey) && e.key === 'c') { e.preventDefault(); fmCopy(); }
+  if ((e.ctrlKey || e.metaKey) && e.key === 'x') { e.preventDefault(); fmCut(); }
+  if ((e.ctrlKey || e.metaKey) && e.key === 'v') { e.preventDefault(); fmPaste(); }
+  if (e.key === 'Delete' || e.key === 'Backspace') {
+    if (fm.selected.size) { e.preventDefault(); fmDelete([...fm.selected][0], false); }
+  }
+  if (e.key === 'F2' && fm.selected.size === 1) {
+    const path = [...fm.selected][0];
+    fmRenameInline(path, path.split('/').pop());
+  }
+  if (e.key === 'Backspace' && !e.ctrlKey) {
+    const parent = fm.cwd.substring(0, fm.cwd.lastIndexOf('/')) || '/';
+    fmNavigate(parent);
+  }
+});
+
+/* ── Helper: file icon by extension ─────────────────── */
+function fmFileIcon(name) {
+  const ext = name.split('.').pop().toLowerCase();
+  const map = {
+    json: '{}', yml: '⚙', yaml: '⚙', sh: '⚡', md: '📝',
+    txt: '📄', log: '📋', py: '🐍', js: '📜', ts: '📜',
+    html: '🌐', css: '🎨', env: '🔑', conf: '⚙', cfg: '⚙',
+    gz: '📦', tar: '📦', zip: '📦', bak: '♻',
+    jpg: '🖼', jpeg: '🖼', png: '🖼', gif: '🖼', svg: '🖼',
+    mp4: '🎬', mp3: '🎵',
+  };
+  return map[ext] || '📄';
+}
+
+function fmFmtSize(bytes) {
+  if (!bytes) return '0 B';
+  return fmtBytes(bytes);
+}
+
+function fmShortDate(iso) {
+  try {
+    const d = new Date(iso);
+    const now = new Date();
+    const diff = (now - d) / 1000;
+    if (diff < 60)   return 'just now';
+    if (diff < 3600) return `${Math.round(diff/60)}m ago`;
+    if (diff < 86400) return `${Math.round(diff/3600)}h ago`;
+    return d.toLocaleDateString('en-GB', { day:'2-digit', month:'short' });
+  } catch { return '—'; }
+}

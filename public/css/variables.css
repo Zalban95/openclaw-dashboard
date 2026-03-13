@@ -1,0 +1,45 @@
+/* ═══════════════════════════════════════════════════════
+   OPENCLAW PANEL — CSS CUSTOM PROPERTIES
+   ═══════════════════════════════════════════════════════ */
+:root {
+  /* Backgrounds */
+  --bg:      #090b0d;
+  --surface: #0f1214;
+  --raised:  #141719;
+  --dim:     #1a1d20;
+  --faint:   #2a3038;
+
+  /* Borders */
+  --border:  #1e2226;
+  --border2: #272d33;
+
+  /* Text */
+  --text:    #c0cad4;
+  --muted:   #505c68;
+  --bright:  #ffffff;
+
+  /* Accent palette */
+  --accent:  #e8a020;
+  --green:   #3ecf74;
+  --red:     #e85050;
+  --blue:    #4a9de8;
+  --purple:  #a078e8;
+  --teal:    #30c8b8;
+  --cyan:    #28b8d8;
+
+  /* Semantic backgrounds */
+  --bg-green:  #0e2016;
+  --bg-red:    #200e0e;
+  --bg-blue:   #0c1a28;
+  --bg-amber:  #201408;
+
+  /* Layout */
+  --sidebar-w: 264px;
+  --header-h:  52px;
+  --radius:    2px;
+
+  /* Transitions */
+  --t-fast:  0.12s ease;
+  --t-base:  0.2s ease;
+  --t-slow:  0.35s ease;
+}

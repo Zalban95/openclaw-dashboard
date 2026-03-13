@@ -1,0 +1,91 @@
+/* ═══════════════════════════════════════════════════════
+   OPENCLAW PANEL — SIDEBAR WIDGETS
+   ═══════════════════════════════════════════════════════ */
+
+/* ── Container pills ─────────────────────────────────── */
+.c-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 7px 9px; margin-bottom: 5px;
+  background: var(--dim); border: 1px solid var(--border2);
+  border-left: 3px solid var(--border2);
+  transition: border-left-color var(--t-slow);
+}
+.c-item.running { border-left-color: var(--green); }
+.c-item.exited  { border-left-color: var(--red); }
+.c-name  { color: var(--bright); font-size: 12px; font-weight: 500; }
+.c-state { font-size: 10px; padding: 2px 7px; background: var(--faint); color: var(--muted); }
+.c-item.running .c-state { background: var(--bg-green); color: var(--green); }
+.c-item.exited  .c-state { background: var(--bg-red);   color: var(--red); }
+
+/* ── GPU card ────────────────────────────────────────── */
+.gpu-card {
+  background: var(--dim); border: 1px solid var(--border2);
+  padding: 10px; margin-bottom: 6px;
+}
+.gpu-name {
+  color: var(--bright); font-size: 11px; margin-bottom: 8px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.gpu-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px 10px; }
+.gm { display: flex; flex-direction: column; gap: 1px; }
+.gm-l { font-size: 9px; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; }
+.gm-v { font-size: 12px; font-weight: 500; color: var(--accent); }
+
+/* ── Shared resource bar ─────────────────────────────── */
+.res-bar {
+  height: 3px; background: var(--border2);
+  border-radius: 2px; overflow: hidden;
+  margin-top: 4px; grid-column: 1 / -1;
+}
+.res-bar-fill {
+  height: 100%; transition: width 0.5s ease;
+  border-radius: 2px;
+}
+.res-bar-fill.amber { background: var(--accent); }
+.res-bar-fill.green { background: var(--green); }
+.res-bar-fill.red   { background: var(--red); }
+.res-bar-fill.blue  { background: var(--blue); }
+
+/* ── System resource card (CPU/RAM) ──────────────────── */
+.sys-card {
+  background: var(--dim); border: 1px solid var(--border2);
+  padding: 10px; margin-bottom: 6px;
+}
+.sys-card-title {
+  font-size: 9px; color: var(--muted);
+  letter-spacing: 0.12em; text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.sys-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px 10px; }
+.sys-metric { display: flex; flex-direction: column; gap: 1px; }
+.sys-label  { font-size: 9px; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; }
+.sys-value  { font-size: 12px; font-weight: 500; }
+.sys-value.cpu { color: var(--teal); }
+.sys-value.ram { color: var(--blue); }
+
+/* ── Model list ──────────────────────────────────────── */
+.model-item {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 5px 8px; background: var(--dim); border: 1px solid var(--border2);
+  margin-bottom: 4px; font-size: 11px;
+}
+.model-item:last-child { margin-bottom: 0; }
+.model-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.model-sz { color: var(--muted); font-size: 10px; flex-shrink: 0; margin-left: 6px; }
+
+/* ── Sidebar quicklinks ──────────────────────────────── */
+.quicklinks { display: flex; flex-direction: column; gap: 2px; }
+.quicklink {
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 8px; background: transparent;
+  border: none; color: var(--muted); cursor: pointer;
+  font-family: inherit; font-size: 11px;
+  text-align: left; border-radius: var(--radius);
+  transition: color var(--t-fast), background var(--t-fast);
+  overflow: hidden;
+}
+.quicklink:hover { color: var(--text); background: var(--dim); }
+.quicklink.active { color: var(--accent); background: var(--bg-amber); }
+.quicklink-icon { font-size: 12px; flex-shrink: 0; width: 14px; text-align: center; }
+.quicklink-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.quicklink-badge { font-size: 9px; color: var(--muted); flex-shrink: 0; }

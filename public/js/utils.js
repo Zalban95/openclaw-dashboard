@@ -1,0 +1,92 @@
+/* ═══════════════════════════════════════════════════════
+   OPENCLAW PANEL — SHARED UTILITIES
+   ═══════════════════════════════════════════════════════ */
+
+/**
+ * Fetch JSON from the API. Throws on HTTP errors.
+ * @param {string} url
+ * @param {{method?:string, body?:object}} opts
+ */
+async function apiFetch(url, opts = {}) {
+  const res = await fetch(url, {
+    method: opts.method || 'GET',
+    headers: opts.body ? { 'Content-Type': 'application/json' } : {},
+    body: opts.body ? JSON.stringify(opts.body) : undefined
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || res.statusText);
+  return data;
+}
+
+/**
+ * Set text + class on a status element.
+ * @param {HTMLElement} el
+ * @param {string} msg
+ * @param {string} [cls] - 'ok' | 'err' | 'info' | 'warn'
+ */
+function setStatus(el, msg, cls) {
+  if (!el) return;
+  el.textContent = msg;
+  el.className = `status-line ${cls || ''}`;
+}
+
+/**
+ * Pipe an SSE response body into an element, then call onDone.
+ * @param {Response} res
+ * @param {HTMLElement} el
+ * @param {Function|null} onDone
+ */
+function streamToEl(res, el, onDone) {
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+
+  function read() {
+    reader.read().then(({ done, value }) => {
+      if (done) { if (onDone) onDone(); return; }
+      const text = decoder.decode(value);
+      text.split('\n').forEach(line => {
+        if (line.startsWith('data: ')) {
+          try { el.textContent += JSON.parse(line.slice(6)); } catch {}
+        }
+      });
+      el.scrollTop = el.scrollHeight;
+      read();
+    });
+  }
+  read();
+}
+
+/**
+ * Format bytes to human-readable string.
+ * @param {number} bytes
+ * @param {number} [dp=1]
+ */
+function fmtBytes(bytes, dp = 1) {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(dp)) + ' ' + sizes[i];
+}
+
+/**
+ * Format a date string to short locale format.
+ * @param {string} dateStr
+ */
+function fmtDate(dateStr) {
+  try {
+    const d = new Date(dateStr);
+    return d.toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' })
+      + ' ' + d.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit', hour12: false });
+  } catch { return dateStr; }
+}
+
+/**
+ * Debounce a function.
+ * @param {Function} fn
+ * @param {number} ms
+ */
+function debounce(fn, ms) {
+  let t;
+  return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
+}

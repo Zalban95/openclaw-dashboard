@@ -1,0 +1,113 @@
+/* ═══════════════════════════════════════════════════════
+   OPENCLAW PANEL — RESPONSIVE / ADAPTIVE LAYOUT
+   ═══════════════════════════════════════════════════════ */
+
+/* ── Medium screens (≤ 1024px) ───────────────────────── */
+@media (max-width: 1024px) {
+  :root { --sidebar-w: 220px; }
+
+  .fm-header-row,
+  .fm-row {
+    grid-template-columns: 26px minmax(0,1fr) 70px 100px 100px;
+  }
+}
+
+/* ── Small screens (≤ 768px) ─────────────────────────── */
+@media (max-width: 768px) {
+  :root { --sidebar-w: 240px; }
+
+  /* Show sidebar toggle button */
+  .sidebar-toggle { display: flex; align-items: center; justify-content: center; }
+
+  /* Hide clock on small screens */
+  #clock { display: none; }
+
+  /* Sidebar becomes overlay */
+  .sidebar {
+    position: fixed;
+    top: var(--header-h);
+    left: 0;
+    bottom: 0;
+    z-index: 200;
+    transform: translateX(-100%);
+    box-shadow: 4px 0 24px rgba(0,0,0,0.6);
+  }
+  .sidebar.open { transform: translateX(0); }
+
+  /* Sidebar backdrop */
+  .sidebar-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    top: var(--header-h);
+    background: rgba(0,0,0,0.5);
+    z-index: 190;
+  }
+  .sidebar-backdrop.visible { display: block; }
+
+  /* Tab pages full width */
+  .tab-page { padding: 12px; }
+
+  /* Config layout stacks */
+  .config-layout { flex-direction: column; }
+  .config-files { width: 100%; max-height: 160px; border-right: none; border-bottom: 1px solid var(--border2); }
+
+  /* File manager stacks */
+  .fm-layout { flex-direction: column; }
+  .fm-sidebar { width: 100%; max-height: 130px; border-right: none; border-bottom: 1px solid var(--border2); flex-direction: row; flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; }
+  .fm-sidebar-group { border-bottom: none; border-right: 1px solid var(--border); padding: 6px 0; flex-shrink: 0; }
+  .fm-sidebar-label { display: none; }
+  .fm-bookmark { padding: 4px 10px; }
+
+  /* Trim file list columns */
+  .fm-header-row,
+  .fm-row {
+    grid-template-columns: 26px minmax(0,1fr) 70px 90px;
+  }
+  /* Hide date column on mobile */
+  .fm-date { display: none; }
+
+  /* Nav tabs scroll */
+  .nav-tabs { gap: 0; }
+  .nav-tab   { padding: 0 12px; font-size: 9px; }
+
+  /* Provider cards */
+  .provider-key-row { flex-wrap: wrap; }
+
+  /* Skills grid single column */
+  .skills-grid { grid-template-columns: 1fr; }
+}
+
+/* ── Extra small (≤ 480px) ───────────────────────────── */
+@media (max-width: 480px) {
+  header { padding: 0 10px; gap: 8px; }
+  .logo-ver { display: none; }
+  .logo-name { font-size: 12px; }
+  .logo-hex { width: 20px; height: 20px; }
+
+  .tab-page { padding: 8px; gap: 8px; }
+
+  .btn { font-size: 10px; padding: 6px 10px; }
+  .btn-sm { font-size: 9px; padding: 3px 8px; }
+
+  .toolbar { gap: 6px; }
+  .toolbar-left { gap: 4px; }
+
+  /* Trim to 3 columns in file manager */
+  .fm-header-row,
+  .fm-row {
+    grid-template-columns: 26px minmax(0,1fr) 80px;
+  }
+  .fm-size { display: none; }
+  .fm-acts { opacity: 1; }
+
+  /* Config file list horizontal scroll */
+  .config-files { flex-direction: row; max-height: 42px; overflow-x: auto; overflow-y: hidden; }
+  .config-file-group { border-right: 1px solid var(--border); border-bottom: none; }
+  .config-file-group-label { display: none; }
+  .config-file-item { padding: 0 12px; height: 42px; flex-direction: row; align-items: center; white-space: nowrap; }
+  .config-file-path { display: none; }
+
+  /* Modals full screen */
+  .modal { width: 100%; max-width: none; min-width: 0; }
+}

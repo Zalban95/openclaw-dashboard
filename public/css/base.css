@@ -1,0 +1,73 @@
+/* ═══════════════════════════════════════════════════════
+   OPENCLAW PANEL — BASE / RESET / UTILITIES
+   ═══════════════════════════════════════════════════════ */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 13px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Scrollbars ─────────────────────────────────────── */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+/* ── Typography ─────────────────────────────────────── */
+a { color: var(--blue); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ── Section labels ─────────────────────────────────── */
+.sec-label {
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.sec-label::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+/* ── Utility classes ────────────────────────────────── */
+.placeholder { color: var(--muted); font-size: 11px; }
+.row         { display: flex; gap: 8px; align-items: flex-end; }
+.flex1       { flex: 1; }
+.mt4         { margin-top: 4px; }
+.mt8         { margin-top: 8px; }
+.mt12        { margin-top: 12px; }
+.scroll-y    { overflow-y: auto; }
+.scroll-x    { overflow-x: auto; }
+.text-green  { color: var(--green); }
+.text-red    { color: var(--red); }
+.text-amber  { color: var(--accent); }
+.text-blue   { color: var(--blue); }
+.text-muted  { color: var(--muted); }
+.text-bright { color: var(--bright); }
+.nowrap      { white-space: nowrap; }
+.ellipsis    { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hidden      { display: none !important; }
+.bold        { font-weight: 600; }
+
+/* ── Animations ─────────────────────────────────────── */
+@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+.blink { animation: blink 1s step-end infinite; }
+
+@keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+.fade-in { animation: fadeIn 0.2s ease forwards; }
+
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+.pulse { animation: pulse 1.5s ease-in-out infinite; }

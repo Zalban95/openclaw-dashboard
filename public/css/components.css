@@ -1,0 +1,210 @@
+/* ═══════════════════════════════════════════════════════
+   OPENCLAW PANEL — REUSABLE COMPONENTS
+   ═══════════════════════════════════════════════════════ */
+
+/* ── Cards ───────────────────────────────────────────── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  padding: 14px 16px;
+}
+.card-title {
+  font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase;
+  color: var(--muted); margin-bottom: 12px;
+  display: flex; align-items: center; gap: 6px;
+}
+.card-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+/* ── Buttons ─────────────────────────────────────────── */
+.btn {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px; font-weight: 500;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 7px 14px;
+  border: 1px solid var(--border2);
+  background: var(--dim); color: var(--text);
+  cursor: pointer;
+  transition: background var(--t-fast), border-color var(--t-fast), color var(--t-fast), transform var(--t-fast);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.btn:hover    { background: var(--raised); border-color: var(--border2); }
+.btn:active   { transform: translateY(1px); }
+.btn:disabled { opacity: 0.3; cursor: not-allowed; transform: none; }
+
+/* Size variants */
+.btn-sm   { font-size: 10px; padding: 4px 10px; }
+.btn-xs   { font-size: 9px;  padding: 3px 7px; letter-spacing: 0.06em; }
+.btn-icon { padding: 5px 8px; min-width: 0; }
+
+/* Color variants */
+.btn-green  { border-color: var(--green);  color: var(--green); }
+.btn-green:hover  { background: var(--bg-green); }
+.btn-red    { border-color: var(--red);    color: var(--red); }
+.btn-red:hover    { background: var(--bg-red); }
+.btn-amber  { border-color: var(--accent); color: var(--accent); }
+.btn-amber:hover  { background: var(--bg-amber); }
+.btn-blue   { border-color: var(--blue);   color: var(--blue); }
+.btn-blue:hover   { background: var(--bg-blue); }
+.btn-purple { border-color: var(--purple); color: var(--purple); }
+.btn-teal   { border-color: var(--teal);   color: var(--teal); }
+
+/* ── Inputs ──────────────────────────────────────────── */
+.input {
+  font-family: 'IBM Plex Mono', monospace; font-size: 12px;
+  background: var(--dim); border: 1px solid var(--border2);
+  color: var(--text); padding: 7px 10px;
+  outline: none; width: 100%;
+  transition: border-color var(--t-base);
+}
+.input:focus   { border-color: var(--accent); }
+.input::placeholder { color: var(--muted); }
+
+.input-label {
+  font-size: 10px; color: var(--muted);
+  letter-spacing: 0.1em; text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.field { margin-bottom: 10px; }
+
+/* Textarea / code editor */
+.editor {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px; line-height: 1.75;
+  background: #060708; border: 1px solid var(--border2);
+  color: #8ab8d8; padding: 12px;
+  resize: none; outline: none; width: 100%;
+  transition: border-color var(--t-base);
+}
+.editor:focus { border-color: var(--accent); }
+.editor.err   { border-color: var(--red); }
+
+/* ── Toolbar ─────────────────────────────────────────── */
+.toolbar {
+  display: flex; align-items: center;
+  justify-content: space-between;
+  gap: 8px; flex-wrap: wrap;
+  flex-shrink: 0;
+}
+.toolbar-left  { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+
+/* ── Status line ─────────────────────────────────────── */
+.status-line {
+  font-size: 11px; color: var(--muted);
+  min-height: 18px; transition: color var(--t-base);
+}
+.status-line.ok   { color: var(--green); }
+.status-line.err  { color: var(--red); }
+.status-line.info { color: var(--blue); }
+.status-line.warn { color: var(--accent); }
+
+/* ── Log/terminal output ─────────────────────────────── */
+.log-out {
+  flex: 1; min-height: 0;
+  background: #060708; border: 1px solid var(--border2);
+  padding: 10px 12px; overflow-y: auto;
+  font-size: 11.5px; line-height: 1.7; color: #7090a0;
+}
+.ll { display: block; white-space: pre-wrap; word-break: break-all; }
+.ll.e { color: var(--red); }
+.ll.w { color: var(--accent); }
+.ll.i { color: #5090b8; }
+
+.terminal {
+  background: #060708; border: 1px solid var(--border2);
+  padding: 10px 12px; font-size: 11px; line-height: 1.7;
+  color: #7090a0; overflow-y: auto; max-height: 220px;
+  white-space: pre-wrap; word-break: break-all;
+}
+.terminal .ok   { color: var(--green); }
+.terminal .fail { color: var(--red); }
+
+/* ── Provider cards (API Keys) ───────────────────────── */
+.provider-card {
+  background: var(--dim); border: 1px solid var(--border2);
+  padding: 12px 14px; margin-bottom: 8px;
+  border-left: 3px solid var(--border2);
+  transition: border-left-color var(--t-base);
+}
+.provider-card.has-key { border-left-color: var(--green); }
+.provider-card.no-key  { border-left-color: var(--red); }
+.provider-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.provider-name   { font-size: 13px; font-weight: 500; color: var(--bright); }
+.provider-badge  { font-size: 10px; padding: 2px 8px; }
+.provider-badge.ok { background: var(--bg-green); color: var(--green); }
+.provider-badge.no { background: var(--bg-red);   color: var(--red); }
+.provider-models { font-size: 10px; color: var(--muted); margin-bottom: 8px; }
+.provider-key-row { display: flex; gap: 6px; }
+.provider-key-row .input { flex: 1; }
+
+/* ── Skill cards ─────────────────────────────────────── */
+.skills-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 8px; overflow-y: auto;
+}
+.skill-card {
+  background: var(--dim); border: 1px solid var(--border2);
+  padding: 10px 12px; display: flex; flex-direction: column; gap: 4px;
+  border-left: 3px solid var(--border2);
+  transition: border-left-color var(--t-base);
+}
+.skill-card:hover { border-left-color: var(--teal); }
+.skill-card-name { color: var(--bright); font-size: 12px; font-weight: 500; }
+.skill-card-ver  { font-size: 10px; color: var(--muted); }
+.skill-card-desc { font-size: 10px; color: var(--muted); line-height: 1.5; flex: 1; }
+.skill-card-del {
+  font-size: 10px; color: var(--red); background: none; border: none;
+  font-family: inherit; cursor: pointer; text-align: right; padding: 0;
+  opacity: 0.5; transition: opacity var(--t-fast);
+}
+.skill-card-del:hover { opacity: 1; }
+
+/* ── Snapshots ───────────────────────────────────────── */
+.snap-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 10px; background: var(--dim); border: 1px solid var(--border2);
+  margin-bottom: 5px;
+}
+.snap-name { color: var(--bright); font-size: 12px; }
+.snap-date { font-size: 10px; color: var(--muted); }
+.snap-actions { display: flex; gap: 5px; }
+
+/* ── Setup scripts ───────────────────────────────────── */
+.script-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 9px 12px; background: var(--dim); border: 1px solid var(--border2);
+  margin-bottom: 5px;
+}
+.script-name { color: var(--bright); font-weight: 500; }
+.script-meta { font-size: 10px; color: var(--muted); }
+
+/* ── Badges / chips ──────────────────────────────────── */
+.badge {
+  font-size: 9px; padding: 2px 6px;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  display: inline-block;
+}
+.badge-green  { background: var(--bg-green);  color: var(--green); }
+.badge-red    { background: var(--bg-red);    color: var(--red); }
+.badge-blue   { background: var(--bg-blue);   color: var(--blue); }
+.badge-amber  { background: var(--bg-amber);  color: var(--accent); }
+
+/* ── Modal overlay ───────────────────────────────────── */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.7);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(2px);
+}
+.modal {
+  background: var(--surface); border: 1px solid var(--border2);
+  padding: 20px; min-width: 320px; max-width: 560px; width: 90%;
+}
+.modal-title {
+  font-size: 11px; letter-spacing: 0.15em; text-transform: uppercase;
+  color: var(--accent); margin-bottom: 14px;
+}
+.modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px; }

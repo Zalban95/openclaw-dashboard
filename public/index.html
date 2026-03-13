@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OpenClaw Panel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<!-- CSS modules -->
+<link rel="stylesheet" href="css/variables.css">
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/layout.css">
+<link rel="stylesheet" href="css/components.css">
+<link rel="stylesheet" href="css/sidebar.css">
+<link rel="stylesheet" href="css/config.css">
+<link rel="stylesheet" href="css/files.css">
+<link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════ HEADER -->
+<header>
+  <div class="logo">
+    <div class="logo-hex"></div>
+    <div>
+      <div class="logo-name">OPENCLAW</div>
+      <div class="logo-ver">PANEL v2</div>
+    </div>
+  </div>
+
+  <nav class="nav-tabs">
+    <button class="nav-tab active" data-tab="controls" onclick="nav('controls')">Controls</button>
+    <button class="nav-tab"        data-tab="logs"     onclick="nav('logs')">Logs</button>
+    <button class="nav-tab"        data-tab="keys"     onclick="nav('keys')">API Keys</button>
+    <button class="nav-tab"        data-tab="skills"   onclick="nav('skills')">Skills</button>
+    <button class="nav-tab"        data-tab="snapshots" onclick="nav('snapshots')">Snapshots</button>
+    <button class="nav-tab"        data-tab="setup"    onclick="nav('setup')">Setup</button>
+    <button class="nav-tab"        data-tab="config"   onclick="nav('config')">Config</button>
+    <button class="nav-tab"        data-tab="files"    onclick="nav('files')">Files</button>
+  </nav>
+
+  <div class="header-right">
+    <span id="clock"></span>
+    <div class="dot" id="dot"></div>
+    <button class="sidebar-toggle" onclick="toggleSidebar()" title="Toggle sidebar">☰</button>
+  </div>
+</header>
+
+<!-- Mobile sidebar backdrop -->
+<div id="sidebar-backdrop" class="sidebar-backdrop" onclick="closeSidebar()"></div>
+
+<!-- ═══════════════════════════════════════════════════ BODY -->
+<div class="app-body">
+
+  <!-- ═══════════════════════════════════════════ SIDEBAR -->
+  <aside class="sidebar">
+
+    <!-- Containers -->
+    <div class="sidebar-section">
+      <div class="sec-label">Containers</div>
+      <div id="s-containers"><div class="placeholder">Loading…</div></div>
+    </div>
+
+    <!-- GPU -->
+    <div class="sidebar-section">
+      <div class="sec-label">GPU</div>
+      <div id="s-gpu"><div class="placeholder">Loading…</div></div>
+    </div>
+
+    <!-- CPU / RAM -->
+    <div class="sidebar-section">
+      <div class="sec-label">System</div>
+      <div id="s-system"><div class="placeholder">Loading…</div></div>
+    </div>
+
+    <!-- Ollama models -->
+    <div class="sidebar-section grow">
+      <div class="sec-label">Ollama Models</div>
+      <div id="s-models"><div class="placeholder">Loading…</div></div>
+    </div>
+
+    <!-- Quick nav -->
+    <div class="sidebar-section">
+      <div class="sec-label">Quick Nav</div>
+      <div class="quicklinks">
+        <button class="quicklink" onclick="nav('controls')"><span class="quicklink-icon">▶</span><span class="quicklink-label">Controls</span></button>
+        <button class="quicklink" onclick="nav('config');  setTimeout(()=>cfgOpenFile('openclaw'),100)"><span class="quicklink-icon">⚙</span><span class="quicklink-label">openclaw.json</span></button>
+        <button class="quicklink" onclick="nav('config');  setTimeout(()=>cfgOpenFile('soul'),100)"><span class="quicklink-icon">👤</span><span class="quicklink-label">SOUL.md</span></button>
+        <button class="quicklink" onclick="nav('config');  setTimeout(()=>cfgOpenFile('compose'),100)"><span class="quicklink-icon">🐳</span><span class="quicklink-label">docker-compose.yml</span></button>
+        <button class="quicklink" onclick="nav('files');   setTimeout(()=>fmNavigate('/home/al/.openclaw'),200)"><span class="quicklink-icon">📁</span><span class="quicklink-label">.openclaw/</span></button>
+        <button class="quicklink" onclick="nav('logs')"><span class="quicklink-icon">📋</span><span class="quicklink-label">Logs</span></button>
+        <button class="quicklink" onclick="nav('keys')"><span class="quicklink-icon">🔑</span><span class="quicklink-label">API Keys</span></button>
+        <button class="quicklink" onclick="nav('snapshots')"><span class="quicklink-icon">📷</span><span class="quicklink-label">Snapshots</span></button>
+      </div>
+    </div>
+
+  </aside>
+
+  <!-- ═══════════════════════════════════════════ CONTENT -->
+  <main class="content">
+
+    <!-- ─── CONTROLS ──────────────────────────────────── -->
+    <div id="tab-controls" class="tab-page active">
+      <div class="card">
+        <div class="card-title">Service Control</div>
+        <div class="toolbar-left">
+          <button class="btn btn-green" onclick="action('start')">▶ Start</button>
+          <button class="btn btn-red"   onclick="action('stop')">■ Stop</button>
+          <button class="btn btn-amber" onclick="action('restart')">↺ Restart</button>
+        </div>
+        <div class="status-line mt8" id="action-status"><span class="blink">_</span></div>
+      </div>
+    </div>
+
+    <!-- ─── LOGS ──────────────────────────────────────── -->
+    <div id="tab-logs" class="tab-page">
+      <div class="toolbar">
+        <div class="toolbar-left">
+          <button class="btn btn-sm" onclick="clearLogs()">Clear</button>
+          <button class="btn btn-sm" id="scroll-btn" onclick="toggleScroll()">Autoscroll ON</button>
+        </div>
+        <div class="status-line" id="log-status"></div>
+      </div>
+      <pre class="log-out" id="log-out"></pre>
+    </div>
+
+    <!-- ─── API KEYS ──────────────────────────────────── -->
+    <div id="tab-keys" class="tab-page">
+      <div class="toolbar">
+        <div class="card-title" style="margin-bottom:0">Providers</div>
+        <button class="btn btn-sm btn-blue" onclick="showAddProvider()">+ Add Provider</button>
+      </div>
+      <div id="providers-list" class="scroll-y" style="flex:1"><div class="placeholder">Loading…</div></div>
+
+      <div id="add-provider-form" style="display:none">
+        <div class="card mt8">
+          <div class="card-title">New Provider</div>
+          <div class="row">
+            <div class="field flex1"><div class="input-label">Name (e.g. groq)</div><input id="np-name" class="input" placeholder="groq"></div>
+            <div class="field flex1"><div class="input-label">Base URL</div><input id="np-url" class="input" placeholder="https://api.groq.com/openai/v1"></div>
+          </div>
+          <div class="field"><div class="input-label">API Key</div><input id="np-key" class="input" type="password" placeholder="sk-…"></div>
+          <div class="toolbar-right">
+            <button class="btn btn-sm" onclick="hideAddProvider()">Cancel</button>
+            <button class="btn btn-sm btn-blue" onclick="addProvider()">Add</button>
+          </div>
+          <div class="status-line mt8" id="np-status"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── SKILLS ────────────────────────────────────── -->
+    <div id="tab-skills" class="tab-page">
+      <div class="toolbar">
+        <div class="row" style="gap:6px;flex:1">
+          <input id="skill-input" class="input flex1" placeholder="skill name (e.g. openai-whisper)" style="max-width:280px">
+          <button class="btn btn-sm btn-blue" onclick="installSkill(false)">Install</button>
+          <button class="btn btn-sm btn-amber" onclick="installSkill(true)">Force Reinstall</button>
+        </div>
+        <button class="btn btn-sm" onclick="loadSkills()">↺ Refresh</button>
+      </div>
+      <div id="install-out" class="terminal" style="display:none"></div>
+      <div id="skills-grid" class="skills-grid" style="flex:1"><div class="placeholder">Loading…</div></div>
+    </div>
+
+    <!-- ─── SNAPSHOTS ─────────────────────────────────── -->
+    <div id="tab-snapshots" class="tab-page">
+      <div class="card">
+        <div class="card-title">Create Snapshot</div>
+        <div class="row">
+          <input id="snap-label" class="input flex1" placeholder="label (optional, e.g. before-groq-test)" style="max-width:300px">
+          <button class="btn btn-amber" onclick="createSnapshot()">📷 Snapshot Now</button>
+        </div>
+      </div>
+      <div id="snap-out" class="terminal" style="display:none"></div>
+      <div class="card" style="flex:1;overflow:hidden;display:flex;flex-direction:column">
+        <div class="toolbar">
+          <div class="card-title" style="margin-bottom:0">Saved Snapshots</div>
+          <button class="btn btn-sm" onclick="loadSnapshots()">↺ Refresh</button>
+        </div>
+        <div id="snap-list" class="scroll-y mt8" style="flex:1"><div class="placeholder">Loading…</div></div>
+      </div>
+    </div>
+
+    <!-- ─── SETUP ─────────────────────────────────────── -->
+    <div id="tab-setup" class="tab-page">
+      <div class="card">
+        <div class="card-title">Setup Scripts</div>
+        <div id="scripts-list"><div class="placeholder">Loading…</div></div>
+      </div>
+      <div id="script-editor-area" style="display:none;flex:1;flex-direction:column;gap:8px">
+        <div class="toolbar">
+          <span id="editing-script-name" style="color:#fff;font-weight:500"></span>
+          <div class="toolbar-right">
+            <button class="btn btn-sm" onclick="closeScriptEditor()">✕ Close</button>
+            <button class="btn btn-sm btn-blue" onclick="saveScript()">Save</button>
+          </div>
+        </div>
+        <textarea id="script-editor" class="editor" style="flex:1;min-height:200px;resize:vertical"></textarea>
+        <div class="status-line" id="script-status"></div>
+      </div>
+    </div>
+
+    <!-- ─── CONFIG ────────────────────────────────────── -->
+    <div id="tab-config" class="tab-page" style="padding:0">
+      <div class="config-layout">
+
+        <!-- File list sidebar -->
+        <div class="config-files">
+          <div id="config-file-list"></div>
+        </div>
+
+        <!-- Editor pane -->
+        <div class="config-editor-pane">
+          <div class="config-editor-header">
+            <span class="config-editor-filename" id="config-editor-filename">Select a file →</span>
+            <div class="config-editor-actions">
+              <button class="btn btn-sm" onclick="reloadConfig()">↺ Reload</button>
+              <button class="btn btn-sm btn-blue" onclick="saveConfig()">Save</button>
+            </div>
+          </div>
+          <textarea id="config-editor" class="editor"
+                    oninput="cfgValidate()" spellcheck="false"
+                    placeholder="Select a file from the list to begin editing…"></textarea>
+          <div class="config-editor-footer">
+            <span id="json-status" class="status-line"></span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ─── FILES ─────────────────────────────────────── -->
+    <div id="tab-files" class="tab-page" style="padding:0">
+      <div class="fm-layout">
+
+        <!-- Bookmarks sidebar -->
+        <div class="fm-sidebar">
+          <div class="fm-sidebar-group">
+            <div class="fm-sidebar-label">Bookmarks</div>
+            <div id="fm-bookmarks-list"></div>
+          </div>
+        </div>
+
+        <!-- File browser -->
+        <div class="fm-main">
+
+          <!-- Breadcrumb -->
+          <div class="fm-breadcrumb" id="fm-breadcrumb"></div>
+
+          <!-- Toolbar -->
+          <div class="fm-toolbar">
+            <div class="toolbar-left">
+              <button class="btn btn-sm" onclick="fmNavigate(fm.cwd.substring(0, fm.cwd.lastIndexOf('/')) || '/')" title="Up">↑ Up</button>
+              <button class="btn btn-sm" onclick="fmRefresh()" title="Refresh">↺</button>
+              <div class="fm-toolbar-sep"></div>
+              <button class="btn btn-sm btn-blue"  onclick="fmNewFolder()">+ Folder</button>
+              <button class="btn btn-sm"            onclick="fmNewFile()">+ File</button>
+              <div class="fm-toolbar-sep"></div>
+              <button class="btn btn-sm" onclick="fmCopy()" title="Copy (Ctrl+C)">⧉ Copy</button>
+              <button class="btn btn-sm" onclick="fmCut()"  title="Cut (Ctrl+X)">✂ Cut</button>
+              <button class="btn btn-sm btn-amber" onclick="fmPaste()" title="Paste (Ctrl+V)">⬇ Paste</button>
+            </div>
+            <input class="input fm-path-input" id="fm-path-input"
+                   placeholder="/path/to/dir" onkeydown="fmGoPath(event)">
+          </div>
+
+          <!-- Column headers -->
+          <div class="fm-header-row">
+            <span></span>
+            <span class="fm-col-h" data-sort="name"  onclick="fmSort('name')">Name</span>
+            <span class="fm-col-h" data-sort="size"  onclick="fmSort('size')">Size</span>
+            <span class="fm-col-h" data-sort="mtime" onclick="fmSort('mtime')">Modified</span>
+            <span class="fm-col-h">Actions</span>
+          </div>
+
+          <!-- File rows -->
+          <div class="fm-list" id="fm-list-inner"></div>
+
+          <!-- Inline editor -->
+          <div class="fm-editor-panel" id="fm-editor-panel" style="display:none">
+            <div class="fm-editor-bar">
+              <span class="fm-editor-filename" id="fm-editor-filename"></span>
+              <div class="toolbar-right">
+                <span class="status-line" id="fm-editor-status"></span>
+                <button class="btn btn-sm btn-blue" onclick="fmSaveEditor()">Save</button>
+                <button class="btn btn-sm" onclick="fmCloseEditor()">✕</button>
+              </div>
+            </div>
+            <textarea id="fm-editor" class="editor" spellcheck="false"></textarea>
+          </div>
+
+          <!-- Status bar -->
+          <div class="fm-statusbar">
+            <span id="fm-statusbar-text"></span>
+            <span id="fm-statusbar-clip"></span>
+            <span style="flex:1"></span>
+            <span class="text-muted">Ctrl+C copy · Ctrl+X cut · Ctrl+V paste · Del delete · F2 rename</span>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div><!-- /app-body -->
+
+<!-- ═══════════════════════════════════════════════════ JS MODULES -->
+<script src="js/state.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/nav.js"></script>
+<script src="js/sidebar.js"></script>
+<script src="js/controls.js"></script>
+<script src="js/logs.js"></script>
+<script src="js/keys.js"></script>
+<script src="js/skills.js"></script>
+<script src="js/snapshots.js"></script>
+<script src="js/setup.js"></script>
+<script src="js/config.js"></script>
+<script src="js/files.js"></script>
+</body>
+</html>

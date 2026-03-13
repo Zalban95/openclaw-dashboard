@@ -1,0 +1,184 @@
+/* ═══════════════════════════════════════════════════════
+   OPENCLAW PANEL — FILE MANAGER TAB
+   ═══════════════════════════════════════════════════════ */
+
+/* ── Layout ──────────────────────────────────────────── */
+.fm-layout {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  gap: 0;
+  border: 1px solid var(--border2);
+}
+
+/* ── Left panel: bookmarks + tree ────────────────────── */
+.fm-sidebar {
+  width: 200px;
+  flex-shrink: 0;
+  background: var(--surface);
+  border-right: 1px solid var(--border2);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+.fm-sidebar-group {
+  border-bottom: 1px solid var(--border);
+  padding: 8px 0;
+}
+.fm-sidebar-label {
+  font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--muted); padding: 2px 10px 6px;
+}
+.fm-bookmark {
+  display: flex; align-items: center; gap: 7px;
+  padding: 5px 10px; cursor: pointer;
+  border: none; background: transparent;
+  font-family: inherit; font-size: 11px; color: var(--muted);
+  text-align: left; width: 100%;
+  transition: color var(--t-fast), background var(--t-fast);
+  border-left: 2px solid transparent;
+}
+.fm-bookmark:hover  { color: var(--text); background: var(--dim); }
+.fm-bookmark.active { color: var(--accent); background: var(--bg-amber); border-left-color: var(--accent); }
+.fm-bookmark-icon   { font-size: 12px; flex-shrink: 0; width: 14px; text-align: center; }
+.fm-bookmark-name   { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── Right panel: breadcrumb + file list ─────────────── */
+.fm-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+}
+
+/* Breadcrumb bar */
+.fm-breadcrumb {
+  display: flex; align-items: center; gap: 0;
+  padding: 0 12px;
+  height: 36px;
+  background: var(--raised);
+  border-bottom: 1px solid var(--border2);
+  flex-shrink: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.fm-breadcrumb::-webkit-scrollbar { display: none; }
+.fm-bc-sep { color: var(--border2); padding: 0 4px; font-size: 12px; flex-shrink: 0; }
+.fm-bc-part {
+  font-size: 11px; color: var(--muted); cursor: pointer;
+  padding: 3px 5px; white-space: nowrap;
+  border: none; background: transparent; font-family: inherit;
+  border-radius: 2px; transition: color var(--t-fast), background var(--t-fast);
+  flex-shrink: 0;
+}
+.fm-bc-part:hover { color: var(--text); background: var(--dim); }
+.fm-bc-part:last-child { color: var(--text); font-weight: 500; }
+
+/* Toolbar */
+.fm-toolbar {
+  display: flex; align-items: center; gap: 6px;
+  padding: 8px 12px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+.fm-toolbar-sep { width: 1px; height: 18px; background: var(--border2); flex-shrink: 0; }
+.fm-path-input {
+  flex: 1; min-width: 180px;
+  font-size: 11px; padding: 4px 8px;
+}
+
+/* File list */
+.fm-list {
+  flex: 1; overflow-y: auto;
+  min-height: 0;
+}
+
+/* Column headers */
+.fm-header-row {
+  display: grid;
+  grid-template-columns: 26px minmax(0,1fr) 80px 130px 110px;
+  gap: 0;
+  padding: 0 12px;
+  height: 30px; align-items: center;
+  border-bottom: 1px solid var(--border);
+  position: sticky; top: 0;
+  background: var(--surface); z-index: 2;
+}
+.fm-col-h {
+  font-size: 9px; color: var(--muted);
+  letter-spacing: 0.12em; text-transform: uppercase;
+  cursor: pointer; user-select: none; padding: 0 4px;
+  transition: color var(--t-fast);
+}
+.fm-col-h:hover { color: var(--text); }
+.fm-col-h.sorted { color: var(--accent); }
+
+/* File rows */
+.fm-row {
+  display: grid;
+  grid-template-columns: 26px minmax(0,1fr) 80px 130px 110px;
+  gap: 0;
+  padding: 0 12px;
+  height: 34px; align-items: center;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background var(--t-fast);
+}
+.fm-row:hover   { background: var(--dim); }
+.fm-row.selected { background: var(--bg-amber); }
+.fm-row.cut     { opacity: 0.5; }
+
+.fm-icon  { font-size: 14px; text-align: center; color: var(--muted); }
+.fm-name  { font-size: 12px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 6px; }
+.fm-row.dir .fm-name { color: var(--blue); font-weight: 500; }
+.fm-size  { font-size: 10px; color: var(--muted); text-align: right; padding-right: 8px; }
+.fm-date  { font-size: 10px; color: var(--muted); }
+.fm-acts  { display: flex; gap: 3px; justify-content: flex-end; opacity: 0; transition: opacity var(--t-fast); }
+.fm-row:hover .fm-acts { opacity: 1; }
+
+/* ── Status bar ──────────────────────────────────────── */
+.fm-statusbar {
+  display: flex; align-items: center; gap: 12px;
+  padding: 0 12px; height: 26px;
+  background: var(--raised); border-top: 1px solid var(--border2);
+  font-size: 10px; color: var(--muted); flex-shrink: 0;
+}
+.fm-clipboard-info { color: var(--accent); }
+
+/* ── Inline text editor ──────────────────────────────── */
+.fm-editor-panel {
+  flex-shrink: 0;
+  border-top: 2px solid var(--accent);
+  display: flex; flex-direction: column;
+  height: 40%;
+  min-height: 180px;
+  background: var(--surface);
+  transition: height var(--t-slow);
+}
+.fm-editor-bar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 12px;
+  background: var(--raised); border-bottom: 1px solid var(--border2);
+  flex-shrink: 0;
+}
+.fm-editor-filename { font-size: 11px; color: var(--accent); flex: 1; }
+#fm-editor { flex: 1; min-height: 0; border: none; resize: none; }
+
+/* ── Rename input overlay ────────────────────────────── */
+.fm-rename-input {
+  background: var(--dim); border: 1px solid var(--accent);
+  color: var(--text); font-family: inherit; font-size: 12px;
+  padding: 2px 6px; outline: none; width: 100%;
+}
+
+/* ── Empty state ─────────────────────────────────────── */
+.fm-empty {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; flex: 1;
+  color: var(--muted); gap: 8px;
+  font-size: 13px;
+}
+.fm-empty-icon { font-size: 32px; opacity: 0.3; }
