@@ -5,4 +5,5 @@
 var autoScroll  = true;
 var logSource   = null;
 var currentTab  = 'controls';
-var sidebarOpen = false;  // mobile drawer state
+var sidebarOpen = false;
+var chatOpen    = false;

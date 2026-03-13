@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════
-   OPENCLAW PANEL — FILE MANAGER
+   OPENCLAW PANEL — FILE MANAGER (upload / download / drag-drop)
    ═══════════════════════════════════════════════════════ */
 
 /* ── State ───────────────────────────────────────────── */
@@ -7,11 +7,11 @@ const fm = {
   cwd:       '/home/al',
   entries:   [],
   selected:  new Set(),
-  clipboard: null,   // { op: 'copy'|'cut', paths: [] }
+  clipboard: null,
   sortBy:    'name',
   sortAsc:   true,
-  editFile:  null,   // path of open inline editor
-  renaming:  null,   // path currently being renamed
+  editFile:  null,
+  renaming:  null,
 };
 
 /* ── Bookmarks ───────────────────────────────────────── */
@@ -34,6 +34,7 @@ function fmInit() {
     fmRefresh(); return;
   }
   fmBuildBookmarks();
+  fmSetupDragDrop();
   fmNavigate(fm.cwd);
 }
 
@@ -111,9 +112,8 @@ function fmRenderList() {
 
   let entries = [...fm.entries];
 
-  // Sort
   entries.sort((a, b) => {
-    if (a.isDir !== b.isDir) return a.isDir ? -1 : 1; // dirs first
+    if (a.isDir !== b.isDir) return a.isDir ? -1 : 1;
     let va = a[fm.sortBy] || '', vb = b[fm.sortBy] || '';
     if (fm.sortBy === 'size') { va = a.size || 0; vb = b.size || 0; }
     const cmp = typeof va === 'number' ? va - vb : va.localeCompare(vb);
@@ -130,26 +130,27 @@ function fmRenderList() {
 }
 
 function fmRowHTML(e) {
-  const path     = `${fm.cwd}/${e.name}`.replace('//', '/');
-  const isCut    = fm.clipboard?.op === 'cut' && fm.clipboard.paths.includes(path);
-  const selected = fm.selected.has(path);
+  const fpath    = `${fm.cwd}/${e.name}`.replace('//', '/');
+  const isCut    = fm.clipboard?.op === 'cut' && fm.clipboard.paths.includes(fpath);
+  const selected = fm.selected.has(fpath);
   const icon     = e.isDir ? '📁' : fmFileIcon(e.name);
   const size     = e.isDir ? '—' : fmFmtSize(e.size);
   const date     = e.mtime ? fmShortDate(e.mtime) : '—';
 
   return `<div class="fm-row ${e.isDir ? 'dir' : ''} ${selected ? 'selected' : ''} ${isCut ? 'cut' : ''}"
-               data-path="${path}" data-name="${e.name}" data-isdir="${e.isDir}"
-               onclick="fmClickRow(event, '${path}', ${e.isDir})"
-               ondblclick="fmDblClick('${path}', ${e.isDir})"
-               oncontextmenu="fmContextMenu(event, '${path}', ${e.isDir})">
+               data-path="${fpath}" data-name="${e.name}" data-isdir="${e.isDir}"
+               onclick="fmClickRow(event, '${fpath}', ${e.isDir})"
+               ondblclick="fmDblClick('${fpath}', ${e.isDir})"
+               oncontextmenu="fmContextMenu(event, '${fpath}', ${e.isDir})">
     <span class="fm-icon">${icon}</span>
     <span class="fm-name" title="${e.name}">${e.name}</span>
     <span class="fm-size">${size}</span>
     <span class="fm-date">${date}</span>
     <span class="fm-acts">
-      ${e.isDir ? '' : `<button class="btn btn-xs" title="Edit" onclick="fmOpenEditor('${path}', event)">✏</button>`}
-      <button class="btn btn-xs" title="Rename" onclick="fmRenameInline('${path}', '${e.name}', event)">↩</button>
-      <button class="btn btn-xs btn-red" title="Delete" onclick="fmDelete('${path}', ${e.isDir}, event)">✕</button>
+      ${!e.isDir ? `<button class="btn btn-xs" title="Download" onclick="fmDownloadFile('${fpath}', event)">⬇</button>` : ''}
+      ${!e.isDir ? `<button class="btn btn-xs" title="Edit" onclick="fmOpenEditor('${fpath}', event)">✏</button>` : ''}
+      <button class="btn btn-xs" title="Rename" onclick="fmRenameInline('${fpath}', '${e.name}', event)">↩</button>
+      <button class="btn btn-xs btn-red" title="Delete" onclick="fmDelete('${fpath}', ${e.isDir}, event)">✕</button>
     </span>
   </div>`;
 }
@@ -159,7 +160,6 @@ function fmClickRow(event, path, isDir) {
   if (event.ctrlKey || event.metaKey) {
     fm.selected.has(path) ? fm.selected.delete(path) : fm.selected.add(path);
   } else if (event.shiftKey) {
-    // range select
     const rows = Array.from(document.querySelectorAll('.fm-row'));
     const idx  = rows.findIndex(r => r.dataset.path === path);
     const lastSelected = [...fm.selected];
@@ -183,17 +183,17 @@ function fmDblClick(path, isDir) {
   else fmOpenEditor(path);
 }
 
-/* ── Context menu (keyboard shortcuts hint) ──────────── */
+/* ── Context menu ────────────────────────────────────── */
 function fmContextMenu(event, path, isDir) {
   event.preventDefault();
   if (!fm.selected.has(path)) fm.selected = new Set([path]);
   fmRenderList();
-  // Simple action modal instead of native context menu
   const acts = [
     { label: isDir ? '→ Open' : '✏ Edit',    fn: () => isDir ? fmNavigate(path) : fmOpenEditor(path) },
     { label: '⧉ Copy',    fn: () => fmCopy() },
     { label: '✂ Cut',     fn: () => fmCut() },
     { label: '↩ Rename',  fn: () => fmRenameInline(path, path.split('/').pop()) },
+    ...(!isDir ? [{ label: '⬇ Download', fn: () => fmDownloadFile(path) }] : []),
     { label: '✕ Delete',  fn: () => fmDelete(path, isDir) },
   ];
   showContextModal(event.clientX, event.clientY, acts);
@@ -317,19 +317,19 @@ async function fmNewFolder() {
 async function fmNewFile() {
   const name = prompt('New file name:');
   if (!name) return;
-  const path = `${fm.cwd}/${name}`;
+  const fpath = `${fm.cwd}/${name}`;
   try {
-    await apiFetch('/api/files/write', { method: 'POST', body: { path, content: '' } });
+    await apiFetch('/api/files/write', { method: 'POST', body: { path: fpath, content: '' } });
     fmRefresh();
-    fmOpenEditor(path);
+    fmOpenEditor(fpath);
   } catch (e) { alert(`Error: ${e.message}`); }
 }
 
 /* ── Inline text editor ──────────────────────────────── */
 async function fmOpenEditor(path, evt) {
   if (evt) evt.stopPropagation();
-  const panel = document.getElementById('fm-editor-panel');
-  const fname = document.getElementById('fm-editor-filename');
+  const panel  = document.getElementById('fm-editor-panel');
+  const fname  = document.getElementById('fm-editor-filename');
   const editor = document.getElementById('fm-editor');
 
   fname.textContent = path;
@@ -391,6 +391,88 @@ function fmSort(by) {
   fmRenderList();
 }
 
+/* ── Upload ──────────────────────────────────────────── */
+function fmUploadClick() {
+  document.getElementById('fm-upload-input').click();
+}
+
+async function fmUploadFiles(fileList) {
+  if (!fileList || !fileList.length) return;
+  const formData = new FormData();
+  formData.append('dest', fm.cwd);
+  for (const f of fileList) formData.append('files', f);
+
+  const bar = document.getElementById('fm-statusbar-text');
+  bar.textContent = `Uploading ${fileList.length} file(s)…`;
+
+  try {
+    const res = await fetch('/api/files/upload', { method: 'POST', body: formData });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Upload failed');
+    const ok   = (data.results || []).filter(r => r.ok).length;
+    const fail = (data.results || []).filter(r => r.error).length;
+    bar.textContent = `Uploaded ${ok} file(s)${fail ? `, ${fail} failed` : ''}`;
+    fmRefresh();
+  } catch (e) {
+    bar.textContent = `Upload error: ${e.message}`;
+  }
+
+  document.getElementById('fm-upload-input').value = '';
+}
+
+/* ── Download ────────────────────────────────────────── */
+function fmDownloadFile(fpath, evt) {
+  if (evt) evt.stopPropagation();
+  const a  = document.createElement('a');
+  a.href   = `/api/files/download?path=${encodeURIComponent(fpath)}`;
+  a.download = fpath.split('/').pop();
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+function fmDownloadSelected() {
+  if (!fm.selected.size) return;
+  for (const p of fm.selected) {
+    const entry = fm.entries.find(e => `${fm.cwd}/${e.name}`.replace('//','/') === p);
+    if (entry && !entry.isDir) fmDownloadFile(p);
+  }
+}
+
+/* ── Drag & Drop ─────────────────────────────────────── */
+function fmSetupDragDrop() {
+  const layout = document.getElementById('fm-layout');
+  const zone   = document.getElementById('fm-drop-zone');
+  let dragCounter = 0;
+
+  layout.addEventListener('dragenter', e => {
+    e.preventDefault();
+    dragCounter++;
+    zone.classList.add('active');
+    document.getElementById('fm-drop-dest').textContent = `→ ${fm.cwd}`;
+  });
+
+  layout.addEventListener('dragleave', e => {
+    e.preventDefault();
+    dragCounter--;
+    if (dragCounter <= 0) { zone.classList.remove('active'); dragCounter = 0; }
+  });
+
+  layout.addEventListener('dragover', e => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  });
+
+  layout.addEventListener('drop', e => {
+    e.preventDefault();
+    dragCounter = 0;
+    zone.classList.remove('active');
+    if (e.dataTransfer.files.length) {
+      fmUploadFiles(e.dataTransfer.files);
+    }
+  });
+}
+
 /* ── Keyboard shortcuts ──────────────────────────────── */
 document.addEventListener('keydown', e => {
   if (currentTab !== 'files') return;
@@ -398,7 +480,7 @@ document.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && e.key === 'c') { e.preventDefault(); fmCopy(); }
   if ((e.ctrlKey || e.metaKey) && e.key === 'x') { e.preventDefault(); fmCut(); }
   if ((e.ctrlKey || e.metaKey) && e.key === 'v') { e.preventDefault(); fmPaste(); }
-  if (e.key === 'Delete' || e.key === 'Backspace') {
+  if (e.key === 'Delete') {
     if (fm.selected.size) { e.preventDefault(); fmDelete([...fm.selected][0], false); }
   }
   if (e.key === 'F2' && fm.selected.size === 1) {
@@ -411,7 +493,7 @@ document.addEventListener('keydown', e => {
   }
 });
 
-/* ── Helper: file icon by extension ─────────────────── */
+/* ── Helpers ─────────────────────────────────────────── */
 function fmFileIcon(name) {
   const ext = name.split('.').pop().toLowerCase();
   const map = {

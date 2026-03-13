@@ -1,6 +1,7 @@
 /**
  * OPENCLAW PANEL — server.js
- * Modules: status, action, logs, config (multi-file), keys, skills, setup, snapshots, files
+ * Modules: status, action, logs, config (multi-file), keys, skills, setup, snapshots,
+ *          files (upload/download), claude code, chat
  */
 'use strict';
 
@@ -9,10 +10,13 @@ const { exec, spawn } = require('child_process');
 const fs   = require('fs');
 const path = require('path');
 const os   = require('os');
+const multer = require('multer');
 
 const app = express();
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '50mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
+
+const uploadMw = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
 
 // ─── Paths ──────────────────────────────────────────────────────────────────
 const COMPOSE_DIR     = process.env.COMPOSE_DIR     || '/home/al/openclaw';
@@ -24,6 +28,7 @@ const SNAPSHOT_SCRIPT = process.env.SNAPSHOT_SCRIPT || '/home/al/snapshot-agent.
 const RESTORE_SCRIPT  = process.env.RESTORE_SCRIPT  || '/home/al/restore-agent.sh';
 const SNAPSHOT_DIR    = process.env.SNAPSHOT_DIR    || '/media/al/NewVolume/openclaw-snapshots';
 const PORT            = process.env.PORT            || 4242;
+const PREFS_FILE      = path.join(__dirname, '.dashboard-prefs.json');
 
 // ─── Multi-file config registry ──────────────────────────────────────────────
 const CONFIG_REGISTRY = {
@@ -266,40 +271,85 @@ app.delete('/api/keys/:name', (req, res) => {
 });
 
 // ─── SKILLS ───────────────────────────────────────────────────────────────────
+
+function readSkillMeta(sp) {
+  let description = '', version = '';
+  for (const fname of ['package.json', 'skill.json', 'manifest.json']) {
+    const fp = path.join(sp, fname);
+    if (fs.existsSync(fp)) {
+      try { const d = JSON.parse(fs.readFileSync(fp, 'utf8')); description = d.description || ''; version = d.version || ''; }
+      catch {}
+      break;
+    }
+  }
+  if (!description) {
+    for (const fname of ['README.md', 'readme.md']) {
+      const fp = path.join(sp, fname);
+      if (fs.existsSync(fp)) {
+        const lines = fs.readFileSync(fp, 'utf8').split('\n');
+        description = lines.find(l => l.trim() && !l.startsWith('#'))?.slice(0, 120) || '';
+        break;
+      }
+    }
+  }
+  return { description, version };
+}
+
 app.get('/api/skills', (req, res) => {
   try {
     if (!fs.existsSync(SKILLS_DIR)) return res.json({ skills: [] });
     const entries = fs.readdirSync(SKILLS_DIR, { withFileTypes: true });
     const skills  = entries.filter(e => e.isDirectory()).map(e => {
+      const isDisabled = e.name.startsWith('.') && e.name.endsWith('.disabled');
+      const realName   = isDisabled ? e.name.slice(1, -9) : e.name;
       const sp = path.join(SKILLS_DIR, e.name);
-      let description = '', version = '';
-      for (const fname of ['package.json', 'skill.json', 'manifest.json']) {
-        const fp = path.join(sp, fname);
-        if (fs.existsSync(fp)) {
-          try { const d = JSON.parse(fs.readFileSync(fp, 'utf8')); description = d.description || ''; version = d.version || ''; }
-          catch {}
-          break;
-        }
-      }
-      if (!description) {
-        for (const fname of ['README.md', 'readme.md']) {
-          const fp = path.join(sp, fname);
-          if (fs.existsSync(fp)) {
-            const lines = fs.readFileSync(fp, 'utf8').split('\n');
-            description = lines.find(l => l.trim() && !l.startsWith('#'))?.slice(0, 120) || '';
-            break;
-          }
-        }
-      }
-      return { name: e.name, version, description };
+      const { description, version } = readSkillMeta(sp);
+      return { name: realName, dirName: e.name, version, description, enabled: !isDisabled };
     });
     res.json({ skills });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+app.get('/api/skills/:name', (req, res) => {
+  const name = req.params.name;
+  const sp = path.join(SKILLS_DIR, name);
+  const disabledPath = path.join(SKILLS_DIR, `.${name}.disabled`);
+  const actualPath = fs.existsSync(sp) ? sp : fs.existsSync(disabledPath) ? disabledPath : null;
+  if (!actualPath) return res.status(404).json({ error: 'Not found' });
+  try {
+    const files = fs.readdirSync(actualPath).map(f => {
+      const s = fs.statSync(path.join(actualPath, f));
+      return { name: f, size: s.size, isDir: s.isDirectory() };
+    });
+    let readme = '';
+    const readmeName = files.find(f => f.name.toLowerCase() === 'readme.md');
+    if (readmeName) readme = fs.readFileSync(path.join(actualPath, readmeName.name), 'utf8');
+    const { description, version } = readSkillMeta(actualPath);
+    const enabled = actualPath === sp;
+    res.json({ name, enabled, version, description, readme, files, path: actualPath });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/skills/:name/toggle', (req, res) => {
+  const name = req.params.name;
+  const sp = path.join(SKILLS_DIR, name);
+  const disabledPath = path.join(SKILLS_DIR, `.${name}.disabled`);
+  try {
+    if (fs.existsSync(sp)) {
+      fs.renameSync(sp, disabledPath);
+      res.json({ ok: true, enabled: false });
+    } else if (fs.existsSync(disabledPath)) {
+      fs.renameSync(disabledPath, sp);
+      res.json({ ok: true, enabled: true });
+    } else {
+      res.status(404).json({ error: 'Skill not found' });
+    }
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 app.post('/api/skills/install', (req, res) => {
   const { skill, force } = req.body;
-  if (!skill || !/^[\w-]+$/.test(skill)) return res.status(400).json({ error: 'Invalid skill name' });
+  if (!skill) return res.status(400).json({ error: 'skill name required' });
   sseHeaders(res);
   const cmd   = `npx clawhub install ${skill}${force ? ' --force' : ''}`;
   const child = spawn('bash', ['-c', cmd], { cwd: WORKSPACE_DIR });
@@ -311,10 +361,11 @@ app.post('/api/skills/install', (req, res) => {
 
 app.delete('/api/skills/:name', (req, res) => {
   const name = req.params.name;
-  if (!/^[\w-]+$/.test(name)) return res.status(400).json({ error: 'Invalid name' });
   const sp = path.join(SKILLS_DIR, name);
-  if (!fs.existsSync(sp)) return res.status(404).json({ error: 'Not found' });
-  try { fs.rmSync(sp, { recursive: true, force: true }); res.json({ ok: true }); }
+  const disabledPath = path.join(SKILLS_DIR, `.${name}.disabled`);
+  const actualPath = fs.existsSync(sp) ? sp : fs.existsSync(disabledPath) ? disabledPath : null;
+  if (!actualPath) return res.status(404).json({ error: 'Not found' });
+  try { fs.rmSync(actualPath, { recursive: true, force: true }); res.json({ ok: true }); }
   catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -509,7 +560,138 @@ app.post('/api/files/paste', (req, res) => {
   res.json({ ok: true });
 });
 
+// ─── FILE UPLOAD / DOWNLOAD ───────────────────────────────────────────────────
+
+app.post('/api/files/upload', uploadMw.array('files', 20), (req, res) => {
+  const dest = req.body.dest;
+  if (!dest || !fmSafe(dest)) return res.status(403).json({ error: 'Destination not allowed' });
+  if (!fs.existsSync(dest)) fs.mkdirSync(dest, { recursive: true });
+  const results = [];
+  for (const file of (req.files || [])) {
+    let name = file.originalname;
+    let target = path.join(dest, name);
+    if (fs.existsSync(target)) {
+      const ext  = path.extname(name);
+      const base = path.basename(name, ext);
+      name   = `${base}_${Date.now()}${ext}`;
+      target = path.join(dest, name);
+    }
+    try {
+      fs.writeFileSync(target, file.buffer);
+      results.push({ name, size: file.size, ok: true });
+    } catch (e) {
+      results.push({ name: file.originalname, error: e.message });
+    }
+  }
+  res.json({ results });
+});
+
+app.get('/api/files/download', (req, res) => {
+  const filePath = req.query.path;
+  if (!filePath || !fmSafe(filePath)) return res.status(403).json({ error: 'Path not allowed' });
+  try {
+    const s = fs.statSync(filePath);
+    if (s.isDirectory()) return res.status(400).json({ error: 'Cannot download directory' });
+    res.download(filePath, path.basename(filePath));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── CLAUDE CODE ──────────────────────────────────────────────────────────────
+
+let claudeProc = null;
+
+app.get('/api/claude/status', async (req, res) => {
+  try {
+    const result = await run('claude --version 2>/dev/null || echo "NOT_FOUND"');
+    const out = result.stdout.trim();
+    const available = !out.includes('NOT_FOUND');
+    res.json({ available, version: available ? out : null, running: !!claudeProc });
+  } catch {
+    res.json({ available: false, version: null, running: !!claudeProc });
+  }
+});
+
+app.post('/api/claude/run', (req, res) => {
+  const { prompt, workdir } = req.body;
+  if (!prompt) return res.status(400).json({ error: 'No prompt' });
+  sseHeaders(res);
+  const cwd = workdir || WORKSPACE_DIR;
+  const child = spawn('claude', ['-p', prompt], {
+    cwd,
+    env: { ...process.env, TERM: 'dumb' }
+  });
+  claudeProc = child;
+  child.stdout.on('data', d => res.write(`data: ${JSON.stringify({ type: 'stdout', text: d.toString() })}\n\n`));
+  child.stderr.on('data', d => res.write(`data: ${JSON.stringify({ type: 'stderr', text: d.toString() })}\n\n`));
+  child.on('close', code => {
+    res.write(`data: ${JSON.stringify({ type: 'done', code })}\n\n`);
+    res.end();
+    if (claudeProc === child) claudeProc = null;
+  });
+  req.on('close', () => { child.kill(); if (claudeProc === child) claudeProc = null; });
+});
+
+app.post('/api/claude/stop', (req, res) => {
+  if (claudeProc) { claudeProc.kill(); claudeProc = null; }
+  res.json({ ok: true });
+});
+
+// ─── CHAT (OpenClaw Agent) ────────────────────────────────────────────────────
+
+const chatHistory = [];
+
+app.get('/api/chat/history', (req, res) => { res.json({ messages: chatHistory }); });
+
+app.post('/api/chat/clear', (req, res) => { chatHistory.length = 0; res.json({ ok: true }); });
+
+app.post('/api/chat', (req, res) => {
+  const { message } = req.body;
+  if (!message) return res.status(400).json({ error: 'No message' });
+  chatHistory.push({ role: 'user', content: message, time: new Date().toISOString() });
+  sseHeaders(res);
+  const child = spawn('claude', ['-p', message], {
+    cwd: WORKSPACE_DIR,
+    env: { ...process.env, TERM: 'dumb' }
+  });
+  let response = '';
+  child.stdout.on('data', d => {
+    const text = d.toString();
+    response += text;
+    res.write(`data: ${JSON.stringify({ type: 'text', text })}\n\n`);
+  });
+  child.stderr.on('data', d => res.write(`data: ${JSON.stringify({ type: 'stderr', text: d.toString() })}\n\n`));
+  child.on('close', code => {
+    if (response) chatHistory.push({ role: 'assistant', content: response, time: new Date().toISOString() });
+    res.write(`data: ${JSON.stringify({ type: 'done', code })}\n\n`);
+    res.end();
+  });
+  req.on('close', () => child.kill());
+});
+
+// ─── CONFIG FAVORITES (user prefs) ───────────────────────────────────────────
+
+function loadPrefs() {
+  try { return JSON.parse(fs.readFileSync(PREFS_FILE, 'utf8')); }
+  catch { return {}; }
+}
+
+app.get('/api/config-favorites', (req, res) => {
+  const prefs = loadPrefs();
+  res.json({ favorites: prefs.favorites || [] });
+});
+
+app.post('/api/config-favorites', (req, res) => {
+  const { favorites } = req.body;
+  if (!Array.isArray(favorites)) return res.status(400).json({ error: 'favorites must be array' });
+  const prefs = loadPrefs();
+  prefs.favorites = favorites;
+  try {
+    fs.writeFileSync(PREFS_FILE, JSON.stringify(prefs, null, 2), 'utf8');
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // ─── Start ────────────────────────────────────────────────────────────────────
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`OpenClaw Panel v2 → http://0.0.0.0:${PORT}`);
+  console.log(`OpenClaw Panel v2.1 → http://0.0.0.0:${PORT}`);
 });

@@ -76,6 +76,9 @@
 
   /* Skills grid single column */
   .skills-grid { grid-template-columns: 1fr; }
+
+  /* Chat panel */
+  .chat-panel { width: calc(100vw - 32px); right: 16px; height: 55vh; }
 }
 
 /* ── Extra small (≤ 480px) ───────────────────────────── */
@@ -110,4 +113,8 @@
 
   /* Modals full screen */
   .modal { width: 100%; max-width: none; min-width: 0; }
+
+  /* Chat panel responsive */
+  .chat-panel { width: calc(100vw - 16px); right: 8px; bottom: 78px; height: 60vh; }
+  .chat-fab { width: 44px; height: 44px; font-size: 18px; bottom: 16px; right: 16px; }
 }

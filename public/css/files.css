@@ -50,6 +50,7 @@
   flex-direction: column;
   overflow: hidden;
   min-width: 0;
+  position: relative;
 }
 
 /* Breadcrumb bar */
@@ -182,3 +183,27 @@
   font-size: 13px;
 }
 .fm-empty-icon { font-size: 32px; opacity: 0.3; }
+
+/* ── Drag & drop zone ───────────────────────────────── */
+.fm-drop-zone {
+  display: none;
+  position: absolute; inset: 0;
+  z-index: 50;
+  background: rgba(9,11,13,0.85);
+  backdrop-filter: blur(4px);
+  align-items: center; justify-content: center;
+}
+.fm-drop-zone.active { display: flex; }
+.fm-drop-inner {
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+  padding: 40px 60px;
+  border: 2px dashed var(--accent);
+  background: var(--bg-amber);
+  color: var(--accent);
+}
+.fm-drop-icon { font-size: 36px; }
+.fm-drop-text {
+  font-size: 13px; font-weight: 500;
+  letter-spacing: 0.08em; text-transform: uppercase;
+}
+.fm-drop-sub { font-size: 11px; color: var(--muted); }

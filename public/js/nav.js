@@ -2,22 +2,19 @@
    OPENCLAW PANEL — NAVIGATION
    ═══════════════════════════════════════════════════════ */
 
-const NAV_TABS = ['controls','logs','keys','skills','snapshots','setup','config','files'];
+const NAV_TABS = ['controls','logs','keys','skills','snapshots','setup','config','files','claude'];
 
 function nav(name) {
   currentTab = name;
 
-  // Update tab buttons
   document.querySelectorAll('.nav-tab').forEach(t => {
     t.classList.toggle('active', t.dataset.tab === name);
   });
 
-  // Update tab pages
   document.querySelectorAll('.tab-page').forEach(el => {
     el.classList.toggle('active', el.id === `tab-${name}`);
   });
 
-  // Lazy-load tab content
   if (name === 'logs'      && !logSource) startLogs();
   if (name === 'keys')     loadKeys();
   if (name === 'skills')   loadSkills();
@@ -25,8 +22,8 @@ function nav(name) {
   if (name === 'setup')    loadScripts();
   if (name === 'config')   initConfig();
   if (name === 'files')    fmInit();
+  if (name === 'claude')   claudeInit();
 
-  // Close mobile sidebar when navigating
   closeSidebar();
 }
 
