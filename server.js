@@ -646,11 +646,20 @@ function resolveEnvVars(str) {
   return str.replace(/\$\{([^}]+)\}/g, (_, name) => process.env[name] ?? '');
 }
 
+/** Parse openclaw.json tolerantly (JSON5-ish: strip comments, trailing commas, bad control chars) */
+function parseOpenclawConfig() {
+  const raw = fs.readFileSync(CONFIG_PATH, 'utf8')
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, ' ')  // strip bad control chars (keep \t \n \r)
+    .replace(/\/\/[^\n]*/g, '')                        // strip // comments
+    .replace(/\/\*[\s\S]*?\*\//g, '')                  // strip /* */ comments
+    .replace(/,(\s*[}\]])/g, '$1');                    // strip trailing commas
+  return JSON.parse(raw);
+}
+
 /** Load gateway URL + auth from openclaw.json for chat completions */
 function loadGatewayChatConfig() {
   try {
-    const raw = fs.readFileSync(CONFIG_PATH, 'utf8');
-    const cfg = JSON.parse(raw.replace(/\/\/.*$/gm, '').replace(/,(\s*[}\]])/g, '$1'));
+    const cfg = parseOpenclawConfig();
     const gw = cfg?.gateway || {};
     const http = gw?.http || {};
     const endpoints = http?.endpoints || {};
