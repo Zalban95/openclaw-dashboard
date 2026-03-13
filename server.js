@@ -657,9 +657,15 @@ function loadGatewayChatConfig() {
     const chatEp = endpoints?.chatCompletions || {};
     if (!chatEp.enabled) return null;
 
-    const port = process.env.OPENCLAW_GATEWAY_PORT || gw?.port || 18789;
-    const host = '127.0.0.1';
-    const url = `http://${host}:${port}/v1/chat/completions`;
+    let url;
+    const envUrl = process.env.OPENCLAW_GATEWAY_URL;
+    if (envUrl) {
+      url = envUrl.replace(/\/$/, '') + '/v1/chat/completions';
+    } else {
+      const port = process.env.OPENCLAW_GATEWAY_PORT || gw?.port || 18789;
+      const host = '127.0.0.1';
+      url = `http://${host}:${port}/v1/chat/completions`;
+    }
 
     const token = resolveEnvVars(gw?.auth?.token || gw?.auth?.password || '');
     return { url, token: token || null };
@@ -750,16 +756,38 @@ app.post('/api/chat', async (req, res) => {
       res.end();
       return;
     } catch (e) {
+      console.error('[chat] gateway error:', e.message);
       res.write(`data: ${JSON.stringify({ type: 'stderr', text: `Gateway error: ${e.message}\nFalling back to claude CLI…\n` })}\n\n`);
     }
+  } else {
+    console.warn('[chat] gateway chat not configured or chatCompletions not enabled');
   }
 
   /* Fallback: claude CLI */
+  let clauDeAvailable = false;
+  try {
+    const test = spawn('which', ['claude']);
+    await new Promise(resolve => test.on('close', code => { clauDeAvailable = code === 0; resolve(); }));
+  } catch {}
+
+  if (!clauDeAvailable) {
+    res.write(`data: ${JSON.stringify({ type: 'stderr', text: 'Chat not available: Gateway unreachable and claude CLI not installed.\nCheck gateway config or install claude CLI.' })}\n\n`);
+    res.write(`data: ${JSON.stringify({ type: 'done', code: 1 })}\n\n`);
+    res.end();
+    return;
+  }
+
   const child = spawn('claude', ['-p', message], {
     cwd: WORKSPACE_DIR,
     env: { ...process.env, TERM: 'dumb' }
   });
   let response = '';
+  child.on('error', err => {
+    console.error('[chat] claude spawn error:', err.message);
+    res.write(`data: ${JSON.stringify({ type: 'stderr', text: `claude CLI error: ${err.message}` })}\n\n`);
+    res.write(`data: ${JSON.stringify({ type: 'done', code: 1 })}\n\n`);
+    res.end();
+  });
   child.stdout.on('data', d => {
     const text = d.toString();
     response += text;

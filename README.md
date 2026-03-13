@@ -53,6 +53,7 @@ If you use auth, ensure `gateway.auth.token` (or `gateway.auth.password`) is set
 | `WORKSPACE_DIR` | `/home/al/.openclaw/workspace` | Workspace root |
 | `SETUP_DIR` | `/home/al` | Setup scripts directory |
 | `SNAPSHOT_DIR` | `/media/al/NewVolume/openclaw-snapshots` | Snapshot storage |
+| `OPENCLAW_GATEWAY_URL` | — | Override gateway base URL (e.g. `http://openclaw-gateway:18789` when dashboard runs in Docker) |
 
 ## Project Structure
 
