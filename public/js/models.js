@@ -414,8 +414,8 @@ async function hfSearch() {
     }
     if (box) box.innerHTML = results.map(m => `
       <div class="models-search-item" onclick="hfSearchSelect('${m.id.replace(/'/g,"\\'")}')">
-        <strong>${m.id}</strong>
-        <span class="models-search-meta">${m.pipeline_tag || ''}  ⬇ ${fmtNumber(m.downloads)}  ♥ ${fmtNumber(m.likes)}</span>
+        <span class="models-search-name">${m.id}</span>
+        <span class="models-search-desc">${m.pipeline_tag ? m.pipeline_tag + '  ·  ' : ''}⬇ ${fmtNumber(m.downloads)}  ♥ ${fmtNumber(m.likes)}</span>
       </div>`).join('');
   } catch (e) {
     if (box) box.innerHTML = `<div class="placeholder" style="color:var(--red);padding:8px">${e.message}</div>`;
@@ -441,11 +441,16 @@ async function hfLoadList() {
       return;
     }
     tbody.innerHTML = repos.map(r => {
-      const size = r.size_on_disk ? fmtBytes(r.size_on_disk) : '—';
-      const date = r.last_modified ? fmtDate(r.last_modified) : '—';
-      const safe = r.repo_id.replace(/'/g, "\\'");
+      const size   = r.size_on_disk ? fmtBytes(r.size_on_disk) : '—';
+      const date   = r.last_modified ? fmtDate(r.last_modified) : '—';
+      const safe   = r.repo_id.replace(/'/g, "\\'");
+      const parts  = r.repo_id.split('/');
+      const org    = parts.length > 1 ? parts[0] : '';
+      const name   = parts.length > 1 ? parts.slice(1).join('/') : r.repo_id;
       return `<tr class="models-row">
-        <td class="models-name">${r.repo_id}</td>
+        <td class="models-name" title="${r.repo_id}">
+          ${org ? `<span style="opacity:.5;font-size:10px">${org}/</span>` : ''}${name}
+        </td>
         <td class="models-size">${r.repo_type || 'model'}</td>
         <td class="models-size">${size}</td>
         <td class="models-date">${date}</td>
@@ -486,7 +491,16 @@ function hfDownload() {
         if (!line.startsWith('data: ')) return;
         try {
           const obj = JSON.parse(line.slice(6));
-          if (obj.status && out) { out.textContent += obj.status; out.scrollTop = out.scrollHeight; }
+          if (obj.status) {
+            if (out) { out.textContent += obj.status; out.scrollTop = out.scrollHeight; }
+            // Parse tqdm percentage from CLI output (e.g. "  5%|▌| 248M/4.67G")
+            const pctMatches = obj.status.match(/(\d+)%/g);
+            if (pctMatches) {
+              const p = parseInt(pctMatches[pctMatches.length - 1]);
+              if (barFil) barFil.style.width = `${p}%`;
+              if (pct)    pct.textContent    = `${p}%`;
+            }
+          }
           if (obj.done) {
             if (bar)  bar.style.display = 'none';
             if (pct)  pct.textContent = '';

@@ -170,7 +170,22 @@ app.get('/api/status', async (req, res) => {
     }
   } catch {}
 
-  res.json({ containers, gpu, system, models, loadedModels, hfModels, time: new Date().toISOString() });
+  // NLM (Non-LLM) detected models — fast fs.existsSync scan
+  let nlmModels = [];
+  try {
+    const localPrefs = mp.local || {};
+    for (const [toolId, def] of Object.entries(LOCAL_NLM_TOOLS)) {
+      const dir = localPrefs[toolId]?.modelsPath || '';
+      for (const m of (def.models || [])) {
+        const filePath = def.detectFile ? def.detectFile(dir, m.name) : null;
+        if (filePath && fs.existsSync(filePath)) {
+          nlmModels.push({ tool: def.label || toolId, name: m.name });
+        }
+      }
+    }
+  } catch {}
+
+  res.json({ containers, gpu, system, models, loadedModels, hfModels, nlmModels, time: new Date().toISOString() });
 });
 
 // ─── ACTIONS ─────────────────────────────────────────────────────────────────
@@ -1963,13 +1978,16 @@ app.post('/api/models/hf/download', (req, res) => {
   if (token)  args.push('--token', token);
   if (cache)  args.push('--cache-dir', cache);
 
+  const hfPath = `${home}/.local/bin:/usr/local/bin:/usr/bin:/bin`;
   const cmdStr = `huggingface-cli ${args.join(' ')}`;
   sseWrite({ status: `Downloading ${repoId}…\n$ ${cmdStr}\n` });
 
-  const child = spawn('bash', ['-lc', cmdStr], {
+  // Use bash -c (no login flag) and embed PATH in the command itself so that
+  // login-profile scripts (.profile, .bashrc) cannot override our PATH.
+  const child = spawn('bash', ['-c', `PATH="${hfPath}:$PATH" ${cmdStr}`], {
     cwd: home,
     env: { ...process.env, HOME: home,
-           PATH: `${home}/.local/bin:/usr/local/bin:${process.env.PATH || '/usr/bin:/bin'}`,
+           PATH: `${hfPath}:${process.env.PATH || ''}`,
            ...(token ? { HF_TOKEN: token } : {}) },
     stdio: ['ignore', 'pipe', 'pipe'],
   });

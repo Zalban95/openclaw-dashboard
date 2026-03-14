@@ -12,6 +12,7 @@ async function pollStatus() {
     renderSystem(data.system || null);
     renderModels(data.models || [], data.loadedModels || []);
     renderHfModels(data.hfModels || []);
+    renderNlmModels(data.nlmModels || []);
 
   } catch {
     document.getElementById('dot').className = 'dot';
@@ -145,6 +146,26 @@ function renderModels(models, loadedModels) {
   }
 
   el.innerHTML = html;
+}
+
+function renderNlmModels(models) {
+  const el = document.getElementById('s-nlm-models');
+  if (!el) return;
+  if (!models || !models.length) {
+    el.innerHTML = '<div class="placeholder">No local models detected</div>'; return;
+  }
+  // Group by tool
+  const byTool = {};
+  models.forEach(m => {
+    if (!byTool[m.tool]) byTool[m.tool] = [];
+    byTool[m.tool].push(m.name);
+  });
+  el.innerHTML = Object.entries(byTool).map(([tool, names]) =>
+    `<div class="models-loaded-header" style="margin-top:4px">${tool}</div>` +
+    names.map(n => `<div class="model-item">
+      <span class="model-name" title="${n}">${n}</span>
+    </div>`).join('')
+  ).join('');
 }
 
 function renderHfModels(repos) {
