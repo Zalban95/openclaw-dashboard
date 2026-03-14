@@ -62,7 +62,7 @@
 
 /* Fixed-height terminal container per session */
 .term-session-container {
-  height: 204px;
+  height: 194px;
   padding: 4px 6px;
   box-sizing: border-box;
   overflow: hidden;

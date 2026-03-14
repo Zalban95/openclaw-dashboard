@@ -68,12 +68,28 @@ function _settingsQNavRender() {
     <div class="settings-tab-row">
       <label class="skill-toggle">
         <input type="checkbox" id="settings-qnav-${t.id}"
-               ${!_quickNavHidden.includes(t.id) ? 'checked' : ''}>
+               ${!_quickNavHidden.includes(t.id) ? 'checked' : ''}
+               onchange="settingsQNavToggleChange('${t.id}', this.checked)">
         <span class="skill-toggle-track"></span>
       </label>
       <span class="settings-tab-label">${t.label}</span>
     </div>
   `).join('');
+}
+
+async function settingsQNavToggleChange(id, visible) {
+  if (visible) {
+    _quickNavHidden = _quickNavHidden.filter(i => i !== id);
+  } else {
+    if (!_quickNavHidden.includes(id)) _quickNavHidden.push(id);
+  }
+  _applyQuickNav(_quickNavHidden);
+  try {
+    await apiFetch('/api/prefs', { method: 'POST', body: { quickNavHidden: _quickNavHidden } });
+  } catch {}
+  // Sync the Settings save-button state
+  const cb = document.getElementById(`settings-qnav-${id}`);
+  if (cb) cb.checked = visible;
 }
 
 function _applyQuickNav(hidden) {
