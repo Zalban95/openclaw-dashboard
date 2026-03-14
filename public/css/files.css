@@ -9,7 +9,12 @@
   overflow: hidden;
   gap: 0;
   border: 1px solid var(--border2);
+  position: relative;
 }
+
+/* Toggle button hidden on desktop, shown on small screens via responsive.css */
+.fm-sidebar-toggle-btn { display: none; }
+.fm-sidebar-backdrop   { display: none; }
 
 /* ── Left panel: bookmarks + tree ────────────────────── */
 .fm-sidebar {

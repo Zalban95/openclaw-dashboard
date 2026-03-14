@@ -52,11 +52,38 @@
   .config-layout { flex-direction: column; }
   .config-files { width: 100%; max-height: 160px; border-right: none; border-bottom: 1px solid var(--border2); }
 
-  /* File manager stacks */
-  .fm-layout { flex-direction: column; }
-  .fm-sidebar { width: 100%; max-height: 130px; border-right: none; border-bottom: 1px solid var(--border2); flex-direction: row; flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; }
-  .fm-sidebar-group { border-bottom: none; border-right: 1px solid var(--border); padding: 6px 0; flex-shrink: 0; }
-  .fm-sidebar-label { display: none; }
+  /* File manager — sidebar becomes a hideable overlay on small screens */
+  .fm-sidebar-toggle-btn { display: inline-flex; }
+
+  .fm-sidebar {
+    position: absolute;
+    top: 0; left: 0; bottom: 0;
+    z-index: 50;
+    width: 200px;
+    transform: translateX(-210px);
+    transition: transform 0.22s ease;
+    border-right: 1px solid var(--border2);
+    box-shadow: 4px 0 16px rgba(0,0,0,0.45);
+  }
+
+  .fm-layout.fm-sidebar-open .fm-sidebar {
+    transform: translateX(0);
+  }
+
+  .fm-sidebar-backdrop {
+    display: none;
+    position: absolute;
+    inset: 0;
+    z-index: 49;
+    background: rgba(0,0,0,0.45);
+    backdrop-filter: blur(2px);
+  }
+
+  .fm-layout.fm-sidebar-open .fm-sidebar-backdrop {
+    display: block;
+  }
+
+  .fm-main { width: 100%; }
   .fm-bookmark { padding: 4px 10px; }
 
   /* Trim file list columns */

@@ -40,6 +40,11 @@ async function fmInit() {
   fmNavigate(fm.cwd);
 }
 
+function fmToggleSidebar() {
+  const layout = document.getElementById('fm-layout');
+  if (layout) layout.classList.toggle('fm-sidebar-open');
+}
+
 /* ── Favorites ────────────────────────────────────────── */
 async function fmLoadFavorites() {
   try {

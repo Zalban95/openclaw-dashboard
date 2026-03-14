@@ -376,6 +376,9 @@
           </div>
         </div>
 
+        <!-- Sidebar backdrop (small screens) -->
+        <div class="fm-sidebar-backdrop" onclick="fmToggleSidebar()"></div>
+
         <!-- File browser -->
         <div class="fm-main">
 
@@ -385,6 +388,7 @@
           <!-- Toolbar -->
           <div class="fm-toolbar">
             <div class="toolbar-left">
+              <button class="btn btn-sm fm-sidebar-toggle-btn" onclick="fmToggleSidebar()" title="Toggle bookmarks">⭐</button>
               <button class="btn btn-sm" onclick="fmNavigate(fm.cwd.substring(0, fm.cwd.lastIndexOf('/')) || '/')" title="Up">↑ Up</button>
               <button class="btn btn-sm" onclick="fmRefresh()" title="Refresh">↺</button>
               <div class="fm-toolbar-sep"></div>
