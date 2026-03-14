@@ -835,9 +835,9 @@ app.get('/api/files/raw', (req, res) => {
 
 const CODE_TOOLS = [
   { id: 'claude', label: 'Claude Code', cmd: 'claude', installHint: 'npm install -g @anthropic-ai/claude-code', url: 'https://github.com/anthropics/claude-code' },
-  { id: 'aider',  label: 'Aider',       cmd: 'aider',  installHint: 'pip install aider-install && aider-install', url: 'https://aider.chat' },
+  { id: 'aider',  label: 'Aider',       cmd: 'aider',  installHint: 'sudo pip install --break-system-packages aider-install && aider-install', url: 'https://aider.chat' },
   { id: 'codex',  label: 'OpenAI Codex CLI', cmd: 'codex', installHint: 'npm install -g @openai/codex', url: 'https://github.com/openai/codex' },
-  { id: 'goose',  label: 'Goose',       cmd: 'goose',  installHint: 'pip install goose-ai', url: 'https://github.com/block/goose' },
+  { id: 'goose',  label: 'Goose',       cmd: 'goose',  installHint: 'sudo pip install --break-system-packages goose-ai', url: 'https://github.com/block/goose' },
 ];
 
 app.get('/api/code/tools', async (req, res) => {
@@ -906,12 +906,18 @@ app.post('/api/code/tools/:id/install', (req, res) => {
   const tool = CODE_TOOLS.find(t => t.id === req.params.id);
   if (!tool) return res.status(404).json({ error: 'Unknown tool' });
 
+  const { password } = req.body || {};
+
   sseHeaders(res);
   const sseWrite = d => { try { res.write(`data: ${JSON.stringify(d)}\n\n`); } catch {} };
 
+  let cmd = tool.installHint;
+  const needsSudo = cmd.includes('sudo ') && typeof password === 'string' && password.length > 0;
+  if (needsSudo) cmd = cmd.replace(/\bsudo\b/g, 'sudo -S');
+
   sseWrite({ status: `Installing ${tool.label}…\n$ ${tool.installHint}\n` });
 
-  const child = spawn('bash', ['-lc', tool.installHint], {
+  const child = spawn('bash', ['-lc', cmd], {
     cwd: process.env.HOME || os.homedir(),
     env: {
       ...process.env,
@@ -919,8 +925,13 @@ app.post('/api/code/tools/:id/install', (req, res) => {
       DEBIAN_FRONTEND: 'noninteractive',
       PATH: `${process.env.HOME || os.homedir()}/.local/bin:${process.env.PATH || '/usr/local/bin:/usr/bin:/bin'}`,
     },
-    stdio: ['ignore', 'pipe', 'pipe'],
+    stdio: ['pipe', 'pipe', 'pipe'],
   });
+
+  if (needsSudo) {
+    child.stdin.write(password + '\n');
+    child.stdin.end();
+  }
 
   child.stdout.on('data', d => sseWrite({ status: d.toString() }));
   child.stderr.on('data', d => sseWrite({ status: d.toString() }));
@@ -1602,7 +1613,7 @@ const SYSTEM_TOOLS = [
     note: 'HuggingFace Hub CLI — for downloading local models',
     repo: 'https://pypi.org/project/huggingface-hub/',
     repoLabel: 'pip: huggingface-hub',
-    installCmd: 'PATH="$HOME/.local/bin:$PATH" python3 -m pip install --user huggingface-hub || python3 -m pip install --break-system-packages huggingface-hub',
+    installCmd: 'sudo pip install --break-system-packages huggingface-hub',
   },
 ];
 

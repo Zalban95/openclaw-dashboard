@@ -152,12 +152,33 @@ function codeConfigEdit(id) {
   }, 200);
 }
 
-async function codeToolInstall(id) {
+function codeToolInstall(id) {
+  const tool = _codeTools.find(t => t.id === id);
+  const needsSudo = tool && tool.installHint && tool.installHint.includes('sudo ');
+
+  if (needsSudo) {
+    sudoAsk(`Installing "${tool.label}" requires elevated privileges.`, pw => {
+      if (pw === null) return;
+      _codeToolRunInstall(id, pw);
+    });
+  } else {
+    _codeToolRunInstall(id, null);
+  }
+}
+
+async function _codeToolRunInstall(id, password) {
   const out = document.getElementById(`code-install-out-${id}`);
   if (out) { out.style.display = 'block'; out.textContent = ''; }
 
   try {
-    const res = await fetch(`/api/code/tools/${id}/install`, { method: 'POST' });
+    const body = { id };
+    if (password !== null && password !== undefined) body.password = password;
+
+    const res = await fetch(`/api/code/tools/${id}/install`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
     const reader  = res.body.getReader();
     const decoder = new TextDecoder();
     const read = async () => {
