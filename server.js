@@ -791,19 +791,26 @@ app.get('/api/code/tools', async (req, res) => {
   // #region agent log
   const _execPath = process.env.PATH || '(empty)';
   const _logFile = require('path').join(__dirname, 'debug-e82941.log');
-  require('fs').appendFileSync(_logFile, JSON.stringify({sessionId:'e82941',location:'server.js:code-tools',message:'PATH env for exec',data:{PATH:_execPath},timestamp:Date.now(),runId:'run1',hypothesisId:'H4'})+'\n');
+  require('fs').appendFileSync(_logFile, JSON.stringify({sessionId:'e82941',location:'server.js:code-tools',message:'PATH env for exec',data:{PATH:_execPath},timestamp:Date.now(),runId:'post-fix',hypothesisId:'H4'})+'\n');
   // #endregion
 
   const results = await Promise.all(CODE_TOOLS.map(t => new Promise(resolve => {
-    exec(`bash -lc "which ${t.cmd} 2>/dev/null || command -v ${t.cmd} 2>/dev/null"`, (err, stdout, stderr) => {
-      const detected = !err && !!stdout.trim();
+    // Try login shell first, fall back to searching common npm/pip/nvm paths directly
+    const detectCmd = [
+      `bash -lc "which ${t.cmd} 2>/dev/null || command -v ${t.cmd} 2>/dev/null"`,
+      `find "$HOME/.nvm/versions" -name "${t.cmd}" -type f 2>/dev/null | head -1`,
+      `find "$HOME/.npm-global/bin" "$HOME/.local/bin" "/usr/local/bin" -name "${t.cmd}" -maxdepth 1 2>/dev/null | head -1`,
+    ].join(' || ');
+    exec(detectCmd, { env: { ...process.env, HOME: process.env.HOME || require('os').homedir() } }, (err, stdout, stderr) => {
+      const detected = !!stdout.trim();
       // #region agent log
-      require('fs').appendFileSync(_logFile, JSON.stringify({sessionId:'e82941',location:'server.js:code-tools-exec',message:'tool detection result',data:{cmd:t.cmd,err:err?.message,stdout:stdout?.trim(),stderr:stderr?.trim(),detected},timestamp:Date.now(),runId:'run1',hypothesisId:'H4-H5'})+'\n');
+      require('fs').appendFileSync(_logFile, JSON.stringify({sessionId:'e82941',location:'server.js:code-tools-exec',message:'tool detection result',data:{cmd:t.cmd,err:err?.message,stdout:stdout?.trim(),stderr:stderr?.trim(),detected},timestamp:Date.now(),runId:'post-fix',hypothesisId:'H4-H5'})+'\n');
       // #endregion
       let version = null;
       if (detected) {
+        const bin = stdout.trim().split('\n')[0];
         try {
-          const vOut = require('child_process').execSync(`bash -lc "${t.cmd} --version 2>/dev/null"`, { timeout: 3000 }).toString().trim();
+          const vOut = require('child_process').execSync(`bash -lc "'${bin}' --version 2>/dev/null || '${bin}' version 2>/dev/null"`, { timeout: 3000 }).toString().trim();
           version = vOut.split('\n')[0].slice(0, 60);
         } catch {}
       }
