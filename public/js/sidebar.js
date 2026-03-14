@@ -11,6 +11,7 @@ async function pollStatus() {
     renderGPU(data.gpu || []);
     renderSystem(data.system || null);
     renderModels(data.models || [], data.loadedModels || []);
+    renderHfModels(data.hfModels || []);
 
   } catch {
     document.getElementById('dot').className = 'dot';
@@ -144,6 +145,20 @@ function renderModels(models, loadedModels) {
   }
 
   el.innerHTML = html;
+}
+
+function renderHfModels(repos) {
+  const el = document.getElementById('s-hf-models');
+  if (!el) return;
+  if (!repos || !repos.length) {
+    el.innerHTML = '<div class="placeholder">No cached models</div>'; return;
+  }
+  el.innerHTML = repos.map(r => {
+    const name = r.repo_id;
+    return `<div class="model-item">
+      <span class="model-name" title="${name}">${name}</span>
+    </div>`;
+  }).join('');
 }
 
 // Clock

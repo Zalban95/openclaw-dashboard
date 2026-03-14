@@ -155,7 +155,22 @@ app.get('/api/status', async (req, res) => {
     } catch {}
   }
 
-  res.json({ containers, gpu, system, models, loadedModels, time: new Date().toISOString() });
+  // HuggingFace cached models — fast synchronous dir scan (no subprocess)
+  const home       = process.env.HOME || os.homedir();
+  const hfCacheDir = mp.hf?.cacheDir || path.join(home, '.cache', 'huggingface', 'hub');
+  let hfModels = [];
+  try {
+    if (fs.existsSync(hfCacheDir)) {
+      hfModels = fs.readdirSync(hfCacheDir)
+        .filter(e => e.startsWith('models--'))
+        .map(e => {
+          const parts = e.split('--');
+          return { repo_id: parts.length >= 3 ? `${parts[1]}/${parts.slice(2).join('/')}` : e };
+        });
+    }
+  } catch {}
+
+  res.json({ containers, gpu, system, models, loadedModels, hfModels, time: new Date().toISOString() });
 });
 
 // ─── ACTIONS ─────────────────────────────────────────────────────────────────
@@ -1863,7 +1878,7 @@ app.get('/api/models/hf/status', (req, res) => {
 
   // Same detection strategy as SYSTEM_TOOLS: try --version, fall back to python import
   const detectCmd = `huggingface-cli --version 2>/dev/null || python3 -c "import huggingface_hub; print(huggingface_hub.__version__)" 2>/dev/null`;
-  exec(`bash -lc "${detectCmd}"`, { env, timeout: 5000 }, (err, stdout) => {
+  exec(`bash -lc "${detectCmd.replace(/"/g, '\\"')}"`, { env, timeout: 5000 }, (err, stdout) => {
     const version = stdout.trim().split('\n')[0] || null;
     if (err || !version) return res.json({ detected: false, version: null, user: null });
     exec(`bash -lc "huggingface-cli whoami 2>/dev/null"`, { env, timeout: 5000 }, (e2, out2) => {
