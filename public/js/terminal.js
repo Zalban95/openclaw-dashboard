@@ -53,6 +53,9 @@ function _termCreate() {
   term.open(container);
   termConnect();
 
+  // Initial fit for the first visit — layout is already settled one rAF after open()
+  requestAnimationFrame(() => _termFit());
+
   // Fit whenever the terminal container is resized (window resize, panel resize)
   termResObs = new ResizeObserver(() => _termFit());
   termResObs.observe(container);
