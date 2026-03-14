@@ -15,6 +15,7 @@ function nav(name) {
     el.classList.toggle('active', el.id === `tab-${name}`);
   });
 
+  if (name === 'controls') controlsInit();
   if (name === 'logs'      && !logSource) startLogs();
   if (name === 'keys')     loadKeys();
   if (name === 'skills')   loadSkills();

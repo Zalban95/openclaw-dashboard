@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>OpenClaw Panel</title>
+<title>DOCA Panel</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <!-- CSS modules -->
@@ -27,7 +27,7 @@
   <div class="logo">
     <div class="logo-hex"></div>
     <div>
-      <div class="logo-name">OPENCLAW</div>
+      <div class="logo-name">DOCA</div>
       <div class="logo-ver">PANEL v2.1</div>
     </div>
   </div>
@@ -120,13 +120,22 @@
     <!-- ─── CONTROLS ──────────────────────────────────── -->
     <div id="tab-controls" class="tab-page active">
       <div class="card">
-        <div class="card-title">Service Control</div>
+        <div class="card-title">DOCA Service Control</div>
         <div class="toolbar-left">
           <button class="btn btn-green" onclick="action('start')">▶ Start</button>
           <button class="btn btn-red"   onclick="action('stop')">■ Stop</button>
           <button class="btn btn-amber" onclick="action('restart')">↺ Restart</button>
         </div>
         <div class="status-line mt8" id="action-status"><span class="blink">_</span></div>
+      </div>
+      <div class="card">
+        <div class="card-title" style="display:flex;align-items:center;gap:8px">
+          All Containers
+          <button class="btn btn-xs" onclick="controlsRefreshContainers()" title="Refresh">↺</button>
+          <span id="controls-containers-count" style="font-size:10px;color:var(--muted);margin-left:4px"></span>
+        </div>
+        <div id="controls-containers-list"><div class="placeholder pulse">Loading…</div></div>
+        <div class="status-line mt8" id="controls-container-status"></div>
       </div>
     </div>
 
@@ -792,7 +801,10 @@
 <script src="js/settings.js"></script>
 <script>
   // Apply persisted hidden tabs immediately on load
-  document.addEventListener('DOMContentLoaded', settingsApplyOnLoad);
+  document.addEventListener('DOMContentLoaded', () => {
+    settingsApplyOnLoad();
+    controlsInit();
+  });
 </script>
 </body>
 </html>

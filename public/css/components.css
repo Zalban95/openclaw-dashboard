@@ -587,6 +587,24 @@
 }
 .snap-path-with-btn .input { min-width: 0; }
 
+/* ── Controls tab — container rows ──────────────────── */
+.ctrl-container-row {
+  display: grid;
+  grid-template-columns: 14px 1fr auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 6px;
+  margin-bottom: 3px;
+  border-radius: var(--radius);
+  font-size: 11px;
+  border: 1px solid var(--border2);
+  background: var(--dim);
+}
+.ctrl-cont-status { font-size: 11px; text-align: center; }
+.ctrl-cont-name   { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ctrl-cont-image  { font-size: 10px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ctrl-cont-actions { display: flex; gap: 4px; flex-shrink: 0; }
+
 /* ── System Tools (sysdeps) ──────────────────────────── */
 .sysdep-group-label {
   font-size: 9px; font-weight: 700; text-transform: uppercase;

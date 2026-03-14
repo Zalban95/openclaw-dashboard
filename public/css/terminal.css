@@ -32,8 +32,6 @@
 /* Each session panel */
 .term-session-wrap {
   flex-shrink: 0;
-  border: 1px solid var(--border);
-  border-radius: 4px;
   overflow: hidden;
   background: #0d1117;
 }
@@ -63,7 +61,7 @@
 
 /* Fixed-height terminal container per session */
 .term-session-container {
-  height: 280px;
+  height: 220px;
   padding: 4px 6px;
   box-sizing: border-box;
   overflow: hidden;

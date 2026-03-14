@@ -1564,7 +1564,7 @@ const SYSTEM_TOOLS = [
     note: 'HuggingFace Hub CLI — for downloading local models',
     repo: 'https://pypi.org/project/huggingface-hub/',
     repoLabel: 'pip: huggingface-hub',
-    installCmd: 'pip3 install huggingface-hub',
+    installCmd: 'python3 -m pip install --user huggingface-hub || python3 -m pip install --break-system-packages huggingface-hub',
   },
 ];
 
