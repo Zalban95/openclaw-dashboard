@@ -45,8 +45,8 @@
   }
   .sidebar-backdrop.visible { display: block; }
 
-  /* Tab pages full width */
-  .tab-page { padding: 12px; }
+  /* Tab pages full width, scrollable on mobile */
+  .tab-page { padding: 12px; overflow-y: auto; }
 
   /* Config layout stacks */
   .config-layout { flex-direction: column; }

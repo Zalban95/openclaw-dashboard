@@ -63,6 +63,7 @@ header {
   display: flex;
   flex: 1;
   min-width: 0;
+  justify-content: center;
   gap: 2px;
   align-items: stretch;
   height: 100%;

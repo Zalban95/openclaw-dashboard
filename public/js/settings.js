@@ -57,7 +57,6 @@ async function settingsSave() {
     setStatus(status, '✓ Saved', 'ok');
     _settingsHidden = hiddenTabs;
     _applyHiddenTabs(hiddenTabs);
-    _sidebarTabTogglesRender();
   } catch (e) {
     setStatus(status, `✗ ${e.message}`, 'err');
   }
@@ -78,34 +77,6 @@ async function settingsApplyOnLoad() {
     _settingsHidden = prefs.hiddenTabs || [];
     _applyHiddenTabs(_settingsHidden);
   } catch {}
-}
-
-/* ── Sidebar quick tab-toggle panel ──────────────────── */
-
-let _sidebarTabPanelOpen = false;
-
-function sidebarTabTogglesOpen() {
-  _sidebarTabPanelOpen = !_sidebarTabPanelOpen;
-  const panel = document.getElementById('sidebar-tab-panel');
-  if (!panel) return;
-  panel.style.display = _sidebarTabPanelOpen ? 'block' : 'none';
-  if (_sidebarTabPanelOpen) _sidebarTabTogglesRender();
-}
-
-function _sidebarTabTogglesRender() {
-  const list = document.getElementById('sidebar-tab-toggles');
-  if (!list) return;
-  list.innerHTML = SETTINGS_TABS.map(t => `
-    <div class="sidebar-tab-toggle-row">
-      <label class="skill-toggle" style="transform:scale(0.8);transform-origin:left center">
-        <input type="checkbox" id="stb-${t.id}"
-               ${!_settingsHidden.includes(t.id) ? 'checked' : ''}
-               onchange="sidebarTabToggleChange('${t.id}', this.checked)">
-        <span class="skill-toggle-track"></span>
-      </label>
-      <span style="font-size:11px">${t.label}</span>
-    </div>
-  `).join('');
 }
 
 /* ── System Tools (sysdeps) ──────────────────────────── */
