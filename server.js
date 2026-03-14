@@ -6,11 +6,18 @@
 'use strict';
 
 const express = require('express');
+const http    = require('http');
 const { exec, spawn } = require('child_process');
 const fs   = require('fs');
 const path = require('path');
 const os   = require('os');
 const multer = require('multer');
+const { WebSocketServer } = require('ws');
+
+let pty = null;
+try { pty = require('node-pty'); } catch (e) {
+  console.warn('[terminal] node-pty not available — run: npm install node-pty');
+}
 
 const app = express();
 app.use(express.json({ limit: '50mb' }));
@@ -596,6 +603,17 @@ app.get('/api/files/download', (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// Serve raw file with correct MIME type (used for media preview)
+app.get('/api/files/raw', (req, res) => {
+  const filePath = req.query.path;
+  if (!filePath || !fmSafe(filePath)) return res.status(403).json({ error: 'Path not allowed' });
+  try {
+    const s = fs.statSync(filePath);
+    if (s.isDirectory()) return res.status(400).json({ error: 'Cannot serve directory' });
+    res.sendFile(path.resolve(filePath));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // ─── CLAUDE CODE ──────────────────────────────────────────────────────────────
 
 let claudeProc = null;
@@ -880,7 +898,57 @@ app.post('/api/config-favorites', (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ─── WebSocket Terminal ───────────────────────────────────────────────────────
+
+const httpServer = http.createServer(app);
+const termWss    = new WebSocketServer({ server: httpServer, path: '/ws/terminal' });
+
+termWss.on('connection', (ws) => {
+  if (!pty) {
+    ws.send(JSON.stringify({ type: 'output', data: '\r\nnode-pty is not installed.\r\nRun: npm install node-pty\r\nthen restart the panel.\r\n' }));
+    ws.close();
+    return;
+  }
+
+  const shell = process.env.SHELL || '/bin/bash';
+  let ptyProc;
+  try {
+    ptyProc = pty.spawn(shell, [], {
+      name: 'xterm-256color',
+      cols: 80, rows: 24,
+      cwd: process.env.HOME || WORKSPACE_DIR,
+      env: process.env
+    });
+  } catch (e) {
+    ws.send(JSON.stringify({ type: 'output', data: `\r\nFailed to spawn shell: ${e.message}\r\n` }));
+    ws.close();
+    return;
+  }
+
+  ptyProc.onData(data => {
+    if (ws.readyState === ws.OPEN)
+      ws.send(JSON.stringify({ type: 'output', data }));
+  });
+
+  ptyProc.onExit(({ exitCode }) => {
+    if (ws.readyState === ws.OPEN) {
+      ws.send(JSON.stringify({ type: 'exit', code: exitCode }));
+      ws.close();
+    }
+  });
+
+  ws.on('message', raw => {
+    try {
+      const { type, data, cols, rows } = JSON.parse(raw.toString());
+      if (type === 'input')  ptyProc.write(data);
+      if (type === 'resize') ptyProc.resize(Math.max(2, cols), Math.max(2, rows));
+    } catch {}
+  });
+
+  ws.on('close', () => { try { ptyProc.kill(); } catch {} });
+});
+
 // ─── Start ────────────────────────────────────────────────────────────────────
-app.listen(PORT, '0.0.0.0', () => {
+httpServer.listen(PORT, '0.0.0.0', () => {
   console.log(`OpenClaw Panel v2.1 → http://0.0.0.0:${PORT}`);
 });

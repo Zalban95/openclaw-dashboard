@@ -147,6 +147,7 @@ function fmRowHTML(e) {
     <span class="fm-size">${size}</span>
     <span class="fm-date">${date}</span>
     <span class="fm-acts">
+      ${!e.isDir && fmMediaType(e.name) ? `<button class="btn btn-xs btn-teal" title="Preview" onclick="fmPreviewFile('${fpath}','${fmMediaType(e.name)}',event)">👁</button>` : ''}
       ${!e.isDir ? `<button class="btn btn-xs" title="Download" onclick="fmDownloadFile('${fpath}', event)">⬇</button>` : ''}
       ${!e.isDir ? `<button class="btn btn-xs" title="Edit" onclick="fmOpenEditor('${fpath}', event)">✏</button>` : ''}
       <button class="btn btn-xs" title="Rename" onclick="fmRenameInline('${fpath}', '${e.name}', event)">↩</button>
@@ -179,8 +180,13 @@ function fmClickRow(event, path, isDir) {
 }
 
 function fmDblClick(path, isDir) {
-  if (isDir) fmNavigate(path);
-  else fmOpenEditor(path);
+  if (isDir) {
+    fmNavigate(path);
+  } else {
+    const mt = fmMediaType(path.split('/').pop());
+    if (mt) fmPreviewFile(path, mt);
+    else fmOpenEditor(path);
+  }
 }
 
 /* ── Context menu ────────────────────────────────────── */
@@ -188,8 +194,10 @@ function fmContextMenu(event, path, isDir) {
   event.preventDefault();
   if (!fm.selected.has(path)) fm.selected = new Set([path]);
   fmRenderList();
+  const mt = !isDir && fmMediaType(path.split('/').pop());
   const acts = [
-    { label: isDir ? '→ Open' : '✏ Edit',    fn: () => isDir ? fmNavigate(path) : fmOpenEditor(path) },
+    ...(mt ? [{ label: '👁 Preview', fn: () => fmPreviewFile(path, mt) }] : []),
+    { label: isDir ? '→ Open' : '✏ Edit', fn: () => isDir ? fmNavigate(path) : fmOpenEditor(path) },
     { label: '⧉ Copy',    fn: () => fmCopy() },
     { label: '✂ Cut',     fn: () => fmCut() },
     { label: '↩ Rename',  fn: () => fmRenameInline(path, path.split('/').pop()) },
@@ -366,6 +374,46 @@ function fmGoPath(evt) {
   }
 }
 
+/* ── Media preview ───────────────────────────────────── */
+function fmPreviewFile(fpath, mediaType, evt) {
+  if (evt) evt.stopPropagation();
+  fm._previewPath = fpath;
+  const modal = document.getElementById('fm-preview-modal');
+  const title = document.getElementById('fm-preview-title');
+  const body  = document.getElementById('fm-preview-body');
+
+  title.textContent = fpath.split('/').pop();
+  body.innerHTML = '';
+
+  const url = `/api/files/raw?path=${encodeURIComponent(fpath)}`;
+
+  if (mediaType === 'image') {
+    const img = document.createElement('img');
+    img.src   = url;
+    img.alt   = title.textContent;
+    body.appendChild(img);
+  } else if (mediaType === 'video') {
+    const v = document.createElement('video');
+    v.src      = url;
+    v.controls = true;
+    v.autoplay = false;
+    body.appendChild(v);
+  } else if (mediaType === 'audio') {
+    const a = document.createElement('audio');
+    a.src      = url;
+    a.controls = true;
+    body.appendChild(a);
+  }
+
+  modal.style.display = 'flex';
+}
+
+function fmClosePreview() {
+  const modal = document.getElementById('fm-preview-modal');
+  modal.querySelectorAll('video,audio').forEach(m => { try { m.pause(); m.src = ''; } catch {} });
+  modal.style.display = 'none';
+}
+
 /* ── Status bar ──────────────────────────────────────── */
 function fmUpdateStatus() {
   const bar  = document.getElementById('fm-statusbar-text');
@@ -493,6 +541,19 @@ document.addEventListener('keydown', e => {
   }
 });
 
+/* ── Media type detection ────────────────────────────── */
+const FM_IMG_EXTS   = new Set(['jpg','jpeg','png','gif','webp','svg','bmp','ico','avif','tiff']);
+const FM_VIDEO_EXTS = new Set(['mp4','webm','ogg','mov','avi','mkv','m4v']);
+const FM_AUDIO_EXTS = new Set(['mp3','wav','flac','aac','m4a','opus']);
+
+function fmMediaType(name) {
+  const ext = name.split('.').pop().toLowerCase();
+  if (FM_IMG_EXTS.has(ext))   return 'image';
+  if (FM_VIDEO_EXTS.has(ext)) return 'video';
+  if (FM_AUDIO_EXTS.has(ext)) return 'audio';
+  return null;
+}
+
 /* ── Helpers ─────────────────────────────────────────── */
 function fmFileIcon(name) {
   const ext = name.split('.').pop().toLowerCase();
@@ -502,7 +563,10 @@ function fmFileIcon(name) {
     html: '🌐', css: '🎨', env: '🔑', conf: '⚙', cfg: '⚙',
     gz: '📦', tar: '📦', zip: '📦', bak: '♻',
     jpg: '🖼', jpeg: '🖼', png: '🖼', gif: '🖼', svg: '🖼',
-    mp4: '🎬', mp3: '🎵',
+    webp: '🖼', avif: '🖼', bmp: '🖼',
+    mp4: '🎬', webm: '🎬', mkv: '🎬', mov: '🎬', avi: '🎬',
+    mp3: '🎵', wav: '🎵', flac: '🎵', aac: '🎵',
+    stl: '🧊', obj: '🧊', step: '🧊', stp: '🧊',
   };
   return map[ext] || '📄';
 }

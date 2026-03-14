@@ -39,66 +39,9 @@ async function claudeCheckStatus() {
   }
 }
 
-/** Start claude interactively (no prompt — streams all output to console) */
+/** Start claude interactively — opens the Terminal tab and runs `claude` there */
 function claudeStart() {
-  const output  = document.getElementById('claude-output');
-  output.innerHTML = '';
-
-  const headerEl = document.createElement('div');
-  headerEl.className = 'claude-prompt-echo';
-  headerEl.textContent = '❯ claude  (interactive session started)';
-  output.appendChild(headerEl);
-
-  const responseEl = document.createElement('div');
-  responseEl.className = 'claude-response';
-  responseEl.id = 'claude-response-active';
-  output.appendChild(responseEl);
-
-  claudeRunning     = true;
-  claudeInteractive = true;
-  document.getElementById('claude-stop-btn').style.display = 'inline-flex';
-  _claudeUpdateInputMode();
-
-  fetch('/api/claude/start', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({})
-  }).then(res => {
-    const reader  = res.body.getReader();
-    const decoder = new TextDecoder();
-    function read() {
-      reader.read().then(({ done, value }) => {
-        if (done) {
-          _claudeSessionEnded(responseEl, output, null);
-          return;
-        }
-        const text = decoder.decode(value);
-        text.split('\n').forEach(line => {
-          if (!line.startsWith('data: ')) return;
-          try {
-            const evt = JSON.parse(line.slice(6));
-            if (evt.type === 'stdout') {
-              responseEl.textContent += evt.text;
-            } else if (evt.type === 'stderr') {
-              const err = document.createElement('span');
-              err.className = 'claude-stderr';
-              err.textContent = evt.text;
-              responseEl.appendChild(err);
-            } else if (evt.type === 'done') {
-              _claudeSessionEnded(responseEl, output, evt.code);
-              return;
-            }
-          } catch {}
-        });
-        output.scrollTop = output.scrollHeight;
-        read();
-      });
-    }
-    read();
-  }).catch(e => {
-    responseEl.textContent = `Error: ${e.message}`;
-    _claudeSessionEnded(responseEl, output, 1);
-  });
+  termLaunchCommand('claude');
 }
 
 /** Send a line to the running interactive session */

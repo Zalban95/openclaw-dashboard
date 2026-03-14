@@ -14,7 +14,10 @@
 <link rel="stylesheet" href="css/sidebar.css">
 <link rel="stylesheet" href="css/config.css">
 <link rel="stylesheet" href="css/files.css">
+<link rel="stylesheet" href="css/terminal.css">
 <link rel="stylesheet" href="css/responsive.css">
+<!-- xterm.js -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css">
 </head>
 <body>
 
@@ -37,7 +40,8 @@
     <button class="nav-tab"        data-tab="setup"    onclick="nav('setup')">Setup</button>
     <button class="nav-tab"        data-tab="config"   onclick="nav('config')">Config</button>
     <button class="nav-tab"        data-tab="files"    onclick="nav('files')">Files</button>
-    <button class="nav-tab"        data-tab="claude"   onclick="nav('claude')">Claude</button>
+    <button class="nav-tab"        data-tab="claude"    onclick="nav('claude')">Claude</button>
+    <button class="nav-tab"        data-tab="terminal"  onclick="nav('terminal')">Terminal</button>
   </nav>
 
   <div class="header-right">
@@ -369,8 +373,32 @@
       </div>
     </div>
 
+    <!-- ─── TERMINAL ────────────────────────────────────── -->
+    <div id="tab-terminal" class="tab-page">
+      <div class="term-toolbar">
+        <button class="btn btn-sm btn-green" onclick="termNewSession()">↺ New Session</button>
+        <span id="term-status" class="term-status">○ not connected</span>
+      </div>
+      <div id="term-container"></div>
+    </div>
+
   </main>
 </div><!-- /app-body -->
+
+<!-- ═══ FILE PREVIEW MODAL ════════════════════════════ -->
+<div id="fm-preview-modal" class="fm-preview-overlay" style="display:none"
+     onclick="fmClosePreview()">
+  <div class="fm-preview-panel" onclick="event.stopPropagation()">
+    <div class="fm-preview-header">
+      <span id="fm-preview-title" class="fm-preview-title"></span>
+      <div class="toolbar-right" style="flex-shrink:0">
+        <button class="btn btn-xs" onclick="fmDownloadFile(fm._previewPath)" title="Download">⬇ Download</button>
+        <button class="btn btn-xs" onclick="fmClosePreview()" title="Close">✕</button>
+      </div>
+    </div>
+    <div class="fm-preview-body" id="fm-preview-body"></div>
+  </div>
+</div>
 
 <!-- ═══════════════════════════════════════════════════ CHAT FAB + PANEL -->
 <button class="chat-fab" id="chat-fab" onclick="toggleChat()" title="Chat with OpenClaw agent">⬡</button>
@@ -393,6 +421,10 @@
   </div>
 </div>
 
+<!-- xterm.js runtime -->
+<script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.min.js"></script>
+
 <!-- ═══════════════════════════════════════════════════ JS MODULES -->
 <script src="js/state.js"></script>
 <script src="js/utils.js"></script>
@@ -408,5 +440,6 @@
 <script src="js/files.js"></script>
 <script src="js/claude.js"></script>
 <script src="js/chat.js"></script>
+<script src="js/terminal.js"></script>
 </body>
 </html>
