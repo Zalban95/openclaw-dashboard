@@ -2,7 +2,7 @@
    OPENCLAW PANEL — NAVIGATION
    ═══════════════════════════════════════════════════════ */
 
-const NAV_TABS = ['controls','logs','keys','skills','snapshots','setup','config','files','claude','terminal'];
+const NAV_TABS = ['controls','logs','keys','skills','snapshots','setup','config','files','claude','terminal','models'];
 
 function nav(name) {
   currentTab = name;
@@ -24,6 +24,7 @@ function nav(name) {
   if (name === 'files')    fmInit();
   if (name === 'claude')   claudeInit();
   if (name === 'terminal') termInit();
+  if (name === 'models')   modelsInit();
 
   closeSidebar();
 }

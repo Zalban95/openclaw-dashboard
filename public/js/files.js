@@ -444,28 +444,62 @@ function fmUploadClick() {
   document.getElementById('fm-upload-input').click();
 }
 
-async function fmUploadFiles(fileList) {
+function fmUploadFiles(fileList) {
   if (!fileList || !fileList.length) return;
   const formData = new FormData();
   formData.append('dest', fm.cwd);
   for (const f of fileList) formData.append('files', f);
 
-  const bar = document.getElementById('fm-statusbar-text');
-  bar.textContent = `Uploading ${fileList.length} file(s)…`;
+  const statusBar  = document.getElementById('fm-statusbar-text');
+  const progressWrap = document.getElementById('fm-upload-progress');
+  const progressBar  = document.getElementById('fm-upload-progress-bar');
+  const pctEl        = document.getElementById('fm-drop-pct');
+  const dropText     = document.getElementById('fm-drop-text');
 
-  try {
-    const res = await fetch('/api/files/upload', { method: 'POST', body: formData });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Upload failed');
-    const ok   = (data.results || []).filter(r => r.ok).length;
-    const fail = (data.results || []).filter(r => r.error).length;
-    bar.textContent = `Uploaded ${ok} file(s)${fail ? `, ${fail} failed` : ''}`;
-    fmRefresh();
-  } catch (e) {
-    bar.textContent = `Upload error: ${e.message}`;
+  statusBar.textContent = `Uploading ${fileList.length} file(s)…`;
+  if (progressWrap) {
+    progressWrap.style.display = 'block';
+    progressBar.style.width    = '0%';
+    pctEl.textContent          = '0%';
+    if (dropText) dropText.textContent = `Uploading ${fileList.length} file(s)…`;
   }
 
-  document.getElementById('fm-upload-input').value = '';
+  const xhr = new XMLHttpRequest();
+
+  xhr.upload.addEventListener('progress', e => {
+    if (!e.lengthComputable) return;
+    const pct = Math.round(e.loaded / e.total * 100);
+    if (progressBar) progressBar.style.width = pct + '%';
+    if (pctEl)       pctEl.textContent       = pct + '%';
+    statusBar.textContent = `Uploading… ${pct}%`;
+  });
+
+  xhr.addEventListener('load', () => {
+    if (progressWrap) progressWrap.style.display = 'none';
+    if (pctEl)        pctEl.textContent = '';
+    if (dropText)     dropText.textContent = 'Drop files here to upload';
+    document.getElementById('fm-upload-input').value = '';
+    try {
+      const data = JSON.parse(xhr.responseText);
+      if (xhr.status >= 400) throw new Error(data.error || 'Upload failed');
+      const ok   = (data.results || []).filter(r => r.ok).length;
+      const fail = (data.results || []).filter(r => r.error).length;
+      statusBar.textContent = `Uploaded ${ok} file(s)${fail ? `, ${fail} failed` : ''}`;
+    } catch (e) {
+      statusBar.textContent = `Upload error: ${e.message}`;
+    }
+    fmRefresh();
+  });
+
+  xhr.addEventListener('error', () => {
+    if (progressWrap) progressWrap.style.display = 'none';
+    if (dropText)     dropText.textContent = 'Drop files here to upload';
+    statusBar.textContent = 'Upload failed (network error)';
+    document.getElementById('fm-upload-input').value = '';
+  });
+
+  xhr.open('POST', '/api/files/upload');
+  xhr.send(formData);
 }
 
 /* ── Download ────────────────────────────────────────── */

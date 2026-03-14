@@ -376,6 +376,38 @@ app.delete('/api/skills/:name', (req, res) => {
   catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// Search skills online via clawhub
+app.get('/api/skills/search', (req, res) => {
+  const q = (req.query.q || '').trim();
+  if (!q) return res.json({ results: [] });
+  exec(`npx clawhub search ${JSON.stringify(q)} --json 2>/dev/null`, { timeout: 15000 }, (err, stdout, stderr) => {
+    if (err) {
+      // clawhub not available or returned error — return structured error
+      return res.json({ error: 'clawhub search unavailable', results: [] });
+    }
+    try {
+      const parsed = JSON.parse(stdout);
+      const results = (Array.isArray(parsed) ? parsed : parsed.results || []).map(s => ({
+        name:        s.name        || s.id || '',
+        description: s.description || '',
+        version:     s.version     || '',
+        official:    !!(s.official || s.verified),
+        community:   !!(s.community),
+        source:      s.source      || s.registry || 'unknown',
+      }));
+      res.json({ results });
+    } catch {
+      // clawhub returned non-JSON — parse text lines as skill names
+      const lines = stdout.trim().split('\n').filter(Boolean);
+      const results = lines.map(l => {
+        const parts = l.trim().split(/\s{2,}/);
+        return { name: parts[0] || l, description: parts[1] || '', official: false, community: true, source: 'clawhub' };
+      });
+      res.json({ results });
+    }
+  });
+});
+
 // ─── SETUP SCRIPTS ────────────────────────────────────────────────────────────
 const ALLOWED_SCRIPTS = ['setup-openclaw.sh', 'setup-phase2.sh', 'snapshot-agent.sh', 'restore-agent.sh'];
 
@@ -411,24 +443,69 @@ app.post('/api/setup/scripts/:name', (req, res) => {
 });
 
 // ─── SNAPSHOTS ────────────────────────────────────────────────────────────────
-app.get('/api/snapshots', (req, res) => {
+
+/** Read snapshot settings from prefs, merging with env/defaults */
+function loadSnapshotSettings() {
+  const prefs = loadPrefs();
+  const s = prefs.snapshotSettings || {};
+  return {
+    snapshotDir:    s.snapshotDir    || SNAPSHOT_DIR,
+    snapshotScript: s.snapshotScript || SNAPSHOT_SCRIPT,
+    restoreScript:  s.restoreScript  || RESTORE_SCRIPT,
+    includePaths:   s.includePaths   || []
+  };
+}
+
+app.get('/api/snapshots/settings', (req, res) => {
+  res.json(loadSnapshotSettings());
+});
+
+app.post('/api/snapshots/settings', (req, res) => {
+  const { snapshotDir, snapshotScript, restoreScript, includePaths } = req.body;
+  const prefs = loadPrefs();
+  prefs.snapshotSettings = { snapshotDir, snapshotScript, restoreScript, includePaths };
   try {
-    if (!fs.existsSync(SNAPSHOT_DIR)) return res.json({ snapshots: [] });
-    const entries = fs.readdirSync(SNAPSHOT_DIR, { withFileTypes: true });
-    const snapshots = entries.filter(e => e.isDirectory()).map(e => {
-      const s = fs.statSync(path.join(SNAPSHOT_DIR, e.name));
-      return { name: e.name, created: s.mtime.toISOString() };
-    }).sort((a, b) => b.created.localeCompare(a.created));
+    fs.writeFileSync(PREFS_FILE, JSON.stringify(prefs, null, 2), 'utf8');
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/snapshots', (req, res) => {
+  const cfg = loadSnapshotSettings();
+  try {
+    if (!fs.existsSync(cfg.snapshotDir)) return res.json({ snapshots: [], warning: `Snapshot dir not found: ${cfg.snapshotDir}` });
+    const entries = fs.readdirSync(cfg.snapshotDir, { withFileTypes: true });
+    const snapshots = entries
+      .filter(e => e.isDirectory() || e.name.endsWith('.tar.gz'))
+      .map(e => {
+        const s = fs.statSync(path.join(cfg.snapshotDir, e.name));
+        const size = e.isDirectory() ? null : s.size;
+        return { name: e.name, created: s.mtime.toISOString(), size };
+      })
+      .sort((a, b) => b.created.localeCompare(a.created));
     res.json({ snapshots });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.post('/api/snapshots/create', (req, res) => {
   const { label } = req.body;
+  const cfg = loadSnapshotSettings();
   sseHeaders(res);
-  const child = spawn('bash', [SNAPSHOT_SCRIPT, ...(label ? [label] : [])]);
+
+  const sseErr = msg => {
+    res.write(`data: ${JSON.stringify(`ERROR: ${msg}`)}\n\n`);
+    res.write(`data: ${JSON.stringify('[exit 1]')}\n\n`);
+    res.end();
+  };
+
+  if (!fs.existsSync(cfg.snapshotScript)) {
+    return sseErr(`Snapshot script not found: ${cfg.snapshotScript}\nConfigure it in Snapshot Settings or create the script.`);
+  }
+  const extraArgs = cfg.includePaths.length ? cfg.includePaths : [];
+  const child = spawn('bash', [cfg.snapshotScript, ...(label ? [label] : []), ...extraArgs]);
   child.stdout.on('data', d => res.write(`data: ${JSON.stringify(d.toString())}\n\n`));
   child.stderr.on('data', d => res.write(`data: ${JSON.stringify(d.toString())}\n\n`));
+  child.on('error', err => sseErr(err.message));
   child.on('close', code => { res.write(`data: ${JSON.stringify(`[exit ${code}]`)}\n\n`); res.end(); });
   req.on('close', () => child.kill());
 });
@@ -436,10 +513,22 @@ app.post('/api/snapshots/create', (req, res) => {
 app.post('/api/snapshots/restore', (req, res) => {
   const { name } = req.body;
   if (!name || !/^[\w.\-]+$/.test(name)) return res.status(400).json({ error: 'Invalid snapshot name' });
+  const cfg = loadSnapshotSettings();
   sseHeaders(res);
-  const child = spawn('bash', [RESTORE_SCRIPT, name]);
+
+  const sseErr = msg => {
+    res.write(`data: ${JSON.stringify(`ERROR: ${msg}`)}\n\n`);
+    res.write(`data: ${JSON.stringify('[exit 1]')}\n\n`);
+    res.end();
+  };
+
+  if (!fs.existsSync(cfg.restoreScript)) {
+    return sseErr(`Restore script not found: ${cfg.restoreScript}\nConfigure it in Snapshot Settings or create the script.`);
+  }
+  const child = spawn('bash', [cfg.restoreScript, name]);
   child.stdout.on('data', d => res.write(`data: ${JSON.stringify(d.toString())}\n\n`));
   child.stderr.on('data', d => res.write(`data: ${JSON.stringify(d.toString())}\n\n`));
+  child.on('error', err => sseErr(err.message));
   child.on('close', code => { res.write(`data: ${JSON.stringify(`[exit ${code}]`)}\n\n`); res.end(); });
   req.on('close', () => child.kill());
 });
@@ -894,6 +983,194 @@ app.post('/api/config-favorites', (req, res) => {
   prefs.favorites = favorites;
   try {
     fs.writeFileSync(PREFS_FILE, JSON.stringify(prefs, null, 2), 'utf8');
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── MODELS ───────────────────────────────────────────────────────────────────
+
+/** Known non-LLM tools with detection commands */
+const KNOWN_TOOLS = [
+  { id: 'whisper',        label: 'Whisper (STT)',          cmd: 'whisper',        type: 'stt'   },
+  { id: 'faster-whisper', label: 'Faster-Whisper (STT)',   cmd: 'faster-whisper', type: 'stt'   },
+  { id: 'kokoro',         label: 'Kokoro TTS',             cmd: 'kokoro',         type: 'tts'   },
+  { id: 'piper',          label: 'Piper TTS',              cmd: 'piper',          type: 'tts'   },
+  { id: 'stable-diffusion', label: 'Stable Diffusion (API)', cmd: null,           type: 'image' },
+  { id: 'comfyui',        label: 'ComfyUI (API)',           cmd: null,            type: 'image' },
+];
+
+function loadModelsPrefs() {
+  const prefs = loadPrefs();
+  return prefs.models || {};
+}
+
+function saveModelsPrefs(models) {
+  const prefs = loadPrefs();
+  prefs.models = models;
+  fs.writeFileSync(PREFS_FILE, JSON.stringify(prefs, null, 2), 'utf8');
+}
+
+// Ollama: get status + version
+app.get('/api/models/ollama/status', async (req, res) => {
+  const mp = loadModelsPrefs();
+  const base = (mp.ollamaUrl || 'http://127.0.0.1:11434').replace(/\/$/, '');
+  try {
+    const r = await fetch(`${base}/api/version`, { signal: AbortSignal.timeout(3000) });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const data = await r.json();
+    res.json({ connected: true, version: data.version || 'unknown', url: base });
+  } catch (e) {
+    res.json({ connected: false, error: e.message, url: base });
+  }
+});
+
+// Ollama: list installed models
+app.get('/api/models/ollama/list', async (req, res) => {
+  const mp = loadModelsPrefs();
+  const base = (mp.ollamaUrl || 'http://127.0.0.1:11434').replace(/\/$/, '');
+  try {
+    const r = await fetch(`${base}/api/tags`, { signal: AbortSignal.timeout(5000) });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const data = await r.json();
+    res.json({ models: data.models || [] });
+  } catch (e) {
+    res.status(503).json({ error: `Cannot reach Ollama at ${base}: ${e.message}` });
+  }
+});
+
+// Ollama: pull a model (SSE progress)
+app.post('/api/models/ollama/pull', async (req, res) => {
+  const { name } = req.body;
+  if (!name) return res.status(400).json({ error: 'model name required' });
+  const mp = loadModelsPrefs();
+  const base = (mp.ollamaUrl || 'http://127.0.0.1:11434').replace(/\/$/, '');
+
+  sseHeaders(res);
+  const sseWrite = d => res.write(`data: ${JSON.stringify(d)}\n\n`);
+
+  try {
+    const r = await fetch(`${base}/api/pull`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, stream: true })
+    });
+    if (!r.ok) {
+      sseWrite({ status: `Error: HTTP ${r.status}` });
+      res.write(`data: ${JSON.stringify({ done: true, error: true })}\n\n`);
+      return res.end();
+    }
+    const reader = r.body.getReader();
+    const dec    = new TextDecoder();
+    let buf = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const lines = buf.split('\n');
+      buf = lines.pop() || '';
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        try {
+          const obj = JSON.parse(line);
+          sseWrite(obj);
+        } catch {}
+      }
+    }
+    sseWrite({ status: 'success', done: true });
+  } catch (e) {
+    sseWrite({ status: `Error: ${e.message}`, done: true, error: true });
+  }
+  res.end();
+});
+
+// Ollama: delete a model
+app.post('/api/models/ollama/delete', async (req, res) => {
+  const { name } = req.body;
+  if (!name) return res.status(400).json({ error: 'model name required' });
+  const mp = loadModelsPrefs();
+  const base = (mp.ollamaUrl || 'http://127.0.0.1:11434').replace(/\/$/, '');
+  try {
+    const r = await fetch(`${base}/api/delete`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name })
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Models settings: get/save
+app.get('/api/models/settings', (req, res) => {
+  res.json(loadModelsPrefs());
+});
+
+app.post('/api/models/settings', (req, res) => {
+  try {
+    saveModelsPrefs(req.body);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Non-LLM tools: detect + availability
+app.get('/api/models/tools', async (req, res) => {
+  const mp = loadModelsPrefs();
+  const toolPrefs = mp.tools || {};
+
+  const results = await Promise.all(KNOWN_TOOLS.map(async t => {
+    const pref = toolPrefs[t.id] || {};
+    let detected = false;
+    let detectedPath = '';
+
+    if (t.cmd) {
+      // Check custom path first, then PATH
+      const customPath = pref.path || '';
+      if (customPath && fs.existsSync(customPath)) {
+        detected = true; detectedPath = customPath;
+      } else {
+        try {
+          const { stdout } = await new Promise((resolve, reject) =>
+            exec(`which ${t.cmd}`, (e, o, er) => e ? reject(e) : resolve({ stdout: o.trim() }))
+          );
+          if (stdout) { detected = true; detectedPath = stdout; }
+        } catch {}
+      }
+    } else {
+      // API-based tool (SD, ComfyUI): check if endpoint responds
+      const apiUrl = pref.apiUrl || '';
+      if (apiUrl) {
+        try {
+          await fetch(apiUrl, { signal: AbortSignal.timeout(2000) });
+          detected = true; detectedPath = apiUrl;
+        } catch {}
+      }
+    }
+
+    return {
+      id:                   t.id,
+      label:                t.label,
+      type:                 t.type,
+      detected,
+      path:                 pref.path    || detectedPath,
+      apiUrl:               pref.apiUrl  || '',
+      availableForOpenclaw: pref.available !== false && detected,
+    };
+  }));
+
+  res.json({ tools: results });
+});
+
+// Save per-tool config
+app.post('/api/models/tools/:id/config', (req, res) => {
+  const { id } = req.params;
+  const { path: toolPath, apiUrl, available } = req.body;
+  try {
+    const mp = loadModelsPrefs();
+    if (!mp.tools) mp.tools = {};
+    mp.tools[id] = { path: toolPath || '', apiUrl: apiUrl || '', available: !!available };
+    saveModelsPrefs(mp);
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });

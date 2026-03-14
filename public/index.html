@@ -15,6 +15,7 @@
 <link rel="stylesheet" href="css/config.css">
 <link rel="stylesheet" href="css/files.css">
 <link rel="stylesheet" href="css/terminal.css">
+<link rel="stylesheet" href="css/models.css">
 <link rel="stylesheet" href="css/responsive.css">
 <!-- xterm.js -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css">
@@ -42,6 +43,7 @@
     <button class="nav-tab"        data-tab="files"    onclick="nav('files')">Files</button>
     <button class="nav-tab"        data-tab="claude"    onclick="nav('claude')">Claude</button>
     <button class="nav-tab"        data-tab="terminal"  onclick="nav('terminal')">Terminal</button>
+    <button class="nav-tab"        data-tab="models"    onclick="nav('models')">Models</button>
   </nav>
 
   <div class="header-right">
@@ -157,17 +159,35 @@
 
     <!-- ─── SKILLS ────────────────────────────────────── -->
     <div id="tab-skills" class="tab-page">
-      <div class="toolbar">
-        <div class="row" style="gap:6px;flex:1">
-          <input id="skill-input" class="input flex1" placeholder="skill name (e.g. openai-whisper)" style="max-width:280px">
+
+      <!-- Mode tabs + install row -->
+      <div class="skills-header">
+        <div class="skills-mode-tabs">
+          <button class="skills-mode-btn active" id="skills-mode-installed" onclick="skillsSetMode('installed')">Installed</button>
+          <button class="skills-mode-btn" id="skills-mode-search" onclick="skillsSetMode('search')">Search Online</button>
+        </div>
+        <!-- Installed mode controls -->
+        <div id="skills-installed-bar" class="skills-bar">
+          <input id="skill-input" class="input flex1" placeholder="skill name or repo (e.g. openai-whisper)" style="max-width:260px">
           <button class="btn btn-sm btn-blue" onclick="installSkill(false)">Install</button>
           <button class="btn btn-sm btn-amber" onclick="installSkill(true)">Force</button>
+          <div style="flex:1"></div>
+          <input id="skill-filter" class="input" placeholder="Filter installed…" style="width:150px" oninput="filterSkills()">
+          <button class="btn btn-sm" onclick="loadSkills()">↺</button>
         </div>
-        <div class="toolbar-right">
-          <input id="skill-filter" class="input" placeholder="Filter…" style="width:140px" oninput="filterSkills()">
-          <button class="btn btn-sm" onclick="loadSkills()">↺ Refresh</button>
+        <!-- Search mode controls -->
+        <div id="skills-search-bar" class="skills-bar" style="display:none">
+          <input id="skill-search-input" class="input flex1" placeholder="Search skills registry…" style="max-width:320px"
+                 onkeydown="if(event.key==='Enter') searchSkillsOnline()">
+          <button class="btn btn-sm btn-blue" onclick="searchSkillsOnline()">Search</button>
+          <div class="skills-flag-group">
+            <label class="skills-flag"><input type="checkbox" id="flag-official"> <span class="badge badge-green" style="font-size:9px">Official</span></label>
+            <label class="skills-flag"><input type="checkbox" id="flag-community"> <span class="badge badge-blue" style="font-size:9px">Community</span></label>
+            <label class="skills-flag"><input type="checkbox" id="flag-unknown"> <span class="badge" style="font-size:9px;background:var(--dim)">Unknown</span></label>
+          </div>
         </div>
       </div>
+
       <div id="install-out" class="terminal" style="display:none"></div>
       <div id="skills-grid" class="skills-grid" style="flex:1"><div class="placeholder">Loading…</div></div>
 
@@ -185,6 +205,36 @@
 
     <!-- ─── SNAPSHOTS ─────────────────────────────────── -->
     <div id="tab-snapshots" class="tab-page">
+
+      <!-- Warning banner if scripts missing -->
+      <div id="snap-warning" class="snap-warning" style="display:none"></div>
+
+      <!-- Settings (collapsible) -->
+      <div class="card snap-settings-card">
+        <div class="snap-settings-toggle" onclick="snapToggleSettings()">
+          <span>⚙ Snapshot Settings</span>
+          <span id="snap-settings-arrow" class="snap-arrow">▼</span>
+        </div>
+        <div id="snap-settings-body" style="display:none;padding-top:10px">
+          <div class="snap-settings-grid">
+            <label class="snap-label-text">Snapshot dir</label>
+            <input id="snap-dir"             class="input" placeholder="/path/to/snapshots">
+            <label class="snap-label-text">Snapshot script</label>
+            <input id="snap-script-create"   class="input" placeholder="/path/to/snapshot.sh">
+            <label class="snap-label-text">Restore script</label>
+            <input id="snap-script-restore"  class="input" placeholder="/path/to/restore.sh">
+            <label class="snap-label-text">Paths to include<br><small style="font-weight:400;opacity:.7">(passed as extra args to the script, one per line)</small></label>
+            <textarea id="snap-include-paths" class="input" rows="4"
+                      placeholder="/home/al/.openclaw&#10;/home/al/openclaw&#10;/home/al/.config/ollama"></textarea>
+          </div>
+          <div style="margin-top:10px">
+            <button class="btn btn-sm btn-blue" onclick="snapSaveSettings()">Save Settings</button>
+            <span id="snap-settings-status" class="status-line" style="margin-left:10px"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Create -->
       <div class="card">
         <div class="card-title">Create Snapshot</div>
         <div class="row">
@@ -193,6 +243,8 @@
         </div>
       </div>
       <div id="snap-out" class="terminal" style="display:none"></div>
+
+      <!-- List -->
       <div class="card" style="flex:1;overflow:hidden;display:flex;flex-direction:column">
         <div class="toolbar">
           <div class="card-title" style="margin-bottom:0">Saved Snapshots</div>
@@ -294,9 +346,13 @@
           <!-- Drag & drop overlay -->
           <div class="fm-drop-zone" id="fm-drop-zone">
             <div class="fm-drop-inner">
-              <div class="fm-drop-icon">⬆</div>
-              <div class="fm-drop-text">Drop files here to upload</div>
+              <div class="fm-drop-icon" id="fm-drop-icon">⬆</div>
+              <div class="fm-drop-text" id="fm-drop-text">Drop files here to upload</div>
               <div class="fm-drop-sub" id="fm-drop-dest"></div>
+              <div class="fm-upload-progress" id="fm-upload-progress" style="display:none">
+                <div class="fm-upload-progress-bar" id="fm-upload-progress-bar"></div>
+              </div>
+              <div class="fm-drop-pct" id="fm-drop-pct"></div>
             </div>
           </div>
 
@@ -373,6 +429,72 @@
       </div>
     </div>
 
+    <!-- ─── MODELS ──────────────────────────────────────── -->
+    <div id="tab-models" class="tab-page">
+
+      <!-- Ollama Settings -->
+      <div class="card">
+        <div class="card-title">Ollama Settings</div>
+        <div class="models-settings-grid">
+          <span class="models-settings-label">API URL</span>
+          <input id="models-ollama-url" class="input" value="http://127.0.0.1:11434">
+          <span class="models-settings-label">Models directory</span>
+          <input id="models-ollama-path" class="input" placeholder="/path/to/ollama/models (optional)">
+        </div>
+        <div style="margin-top:10px;display:flex;align-items:center;gap:10px">
+          <button class="btn btn-sm btn-blue" onclick="modelsSaveSettings()">Save</button>
+          <button class="btn btn-sm" onclick="modelsCheckOllama(); modelsLoadList()">↺ Refresh</button>
+          <span id="models-ollama-badge" class="badge badge-blue">…</span>
+          <span id="models-settings-status" class="status-line"></span>
+        </div>
+      </div>
+
+      <!-- Installed Models -->
+      <div class="card">
+        <div class="card-title">Installed Models</div>
+        <!-- Pull row -->
+        <div class="models-pull-row">
+          <input id="models-pull-input" class="input" placeholder="model name (e.g. llama3.2, qwen2.5:7b)"
+                 style="max-width:300px"
+                 onkeydown="if(event.key==='Enter') modelsPull()">
+          <button class="btn btn-sm btn-teal" onclick="modelsPull()">⬇ Pull</button>
+          <div class="models-pull-progress" id="models-pull-bar" style="display:none">
+            <div class="models-pull-progress-bar" id="models-pull-bar-fill"></div>
+          </div>
+          <span class="models-pull-pct" id="models-pull-pct"></span>
+        </div>
+        <div id="models-pull-out" class="terminal" style="display:none;max-height:140px;margin-top:6px"></div>
+        <!-- Table -->
+        <div style="overflow-x:auto;margin-top:10px">
+          <table class="models-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Size</th>
+                <th>Modified</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="models-table-body">
+              <tr><td colspan="4" class="placeholder" style="padding:12px">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Non-LLM Tools -->
+      <div class="card" style="flex:1;overflow:hidden;display:flex;flex-direction:column">
+        <div class="toolbar">
+          <div class="card-title" style="margin-bottom:0">Non-LLM Tools</div>
+          <button class="btn btn-sm" onclick="modelsLoadTools()">↺ Refresh</button>
+        </div>
+        <div id="models-tools-list" class="scroll-y" style="flex:1;padding-top:8px">
+          <div class="placeholder pulse">Detecting…</div>
+        </div>
+      </div>
+
+    </div>
+
     <!-- ─── TERMINAL ────────────────────────────────────── -->
     <div id="tab-terminal" class="tab-page">
       <div class="term-toolbar">
@@ -441,5 +563,6 @@
 <script src="js/claude.js"></script>
 <script src="js/chat.js"></script>
 <script src="js/terminal.js"></script>
+<script src="js/models.js"></script>
 </body>
 </html>

@@ -138,22 +138,46 @@
 .provider-key-row { display: flex; gap: 6px; }
 .provider-key-row .input { flex: 1; }
 
+/* ── Skills header + mode tabs ───────────────────────── */
+.skills-header {
+  display: flex; flex-direction: column; gap: 6px;
+  flex-shrink: 0; padding-bottom: 4px;
+}
+.skills-mode-tabs { display: flex; gap: 4px; }
+.skills-mode-btn {
+  padding: 4px 14px; font-size: 11px; font-family: inherit;
+  background: var(--dim); border: 1px solid var(--border2);
+  color: var(--muted); cursor: pointer; border-radius: 3px;
+  transition: all var(--t-fast);
+}
+.skills-mode-btn.active { background: var(--surface); border-color: var(--accent); color: var(--text); }
+.skills-bar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.skills-flag-group { display: flex; gap: 8px; align-items: center; margin-left: 8px; }
+.skills-flag { display: flex; align-items: center; gap: 4px; cursor: pointer; font-size: 11px; }
+.skills-flag input { cursor: pointer; }
+.skill-trust-badges { display: flex; gap: 4px; flex-shrink: 0; }
+
 /* ── Skill cards ─────────────────────────────────────── */
 .skills-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(220px, 280px));
   gap: 8px; overflow-y: auto;
 }
 .skill-card {
   background: var(--dim); border: 1px solid var(--border2);
   padding: 10px 12px; display: flex; flex-direction: column; gap: 4px;
-  border-left: 3px solid var(--teal);
+  border-left: 3px solid var(--teal); max-width: 280px;
   transition: border-left-color var(--t-base), opacity var(--t-base);
 }
 .skill-card.disabled { border-left-color: var(--border2); opacity: 0.6; }
 .skill-card:hover { border-left-color: var(--accent); opacity: 1; }
-.skill-card-header { display: flex; justify-content: space-between; align-items: center; }
-.skill-card-name { color: var(--bright); font-size: 12px; font-weight: 500; }
+.skill-card-header {
+  display: flex; justify-content: space-between; align-items: flex-start; gap: 6px;
+}
+.skill-card-name {
+  color: var(--bright); font-size: 12px; font-weight: 500;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0;
+}
 .skill-card-ver  { font-size: 10px; color: var(--muted); }
 .skill-card-desc { font-size: 10px; color: var(--muted); line-height: 1.5; flex: 1; }
 .skill-card-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 4px; }
@@ -352,6 +376,29 @@
   margin-top: 10px; text-align: center;
   letter-spacing: 0.1em;
 }
+
+/* ── Snapshot settings ───────────────────────────────── */
+.snap-warning {
+  padding: 8px 12px; border-radius: 4px; font-size: 11px;
+  margin-bottom: 8px; border-left: 3px solid var(--amber);
+  background: var(--bg-amber); color: var(--text);
+  white-space: pre-wrap;
+}
+.snap-warning-error { border-left-color: var(--red); background: rgba(255,70,70,.08); }
+.snap-warning-info  { border-left-color: var(--blue); background: rgba(56,139,253,.08); }
+.snap-settings-card { padding: 0; overflow: hidden; }
+.snap-settings-toggle {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 14px; cursor: pointer; font-size: 12px; font-weight: 500;
+  user-select: none; color: var(--text-muted);
+}
+.snap-settings-toggle:hover { color: var(--text); }
+.snap-arrow { font-size: 10px; }
+.snap-settings-grid {
+  display: grid; grid-template-columns: 160px 1fr;
+  gap: 8px 12px; align-items: start; padding: 0 14px;
+}
+.snap-label-text { font-size: 11px; color: var(--muted); padding-top: 6px; line-height:1.4; }
 
 /* Claude history */
 .claude-hist-item {

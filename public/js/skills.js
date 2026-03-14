@@ -1,9 +1,27 @@
 /* ═══════════════════════════════════════════════════════
-   OPENCLAW PANEL — SKILLS (enhanced)
+   OPENCLAW PANEL — SKILLS (installed + online search)
    ═══════════════════════════════════════════════════════ */
 
-let allSkills = [];
+let allSkills    = [];
+let skillsMode   = 'installed'; // 'installed' | 'search'
 
+/* ── Mode toggle ─────────────────────────────────────── */
+function skillsSetMode(mode) {
+  skillsMode = mode;
+  document.getElementById('skills-mode-installed').classList.toggle('active', mode === 'installed');
+  document.getElementById('skills-mode-search').classList.toggle('active', mode === 'search');
+  document.getElementById('skills-installed-bar').style.display = mode === 'installed' ? 'flex' : 'none';
+  document.getElementById('skills-search-bar').style.display    = mode === 'search'    ? 'flex' : 'none';
+
+  if (mode === 'installed') {
+    renderSkills(allSkills);
+  } else {
+    document.getElementById('skills-grid').innerHTML =
+      '<div class="placeholder">Enter a query above and press Search</div>';
+  }
+}
+
+/* ── Installed skills ────────────────────────────────── */
 async function loadSkills() {
   const grid = document.getElementById('skills-grid');
   grid.innerHTML = '<div class="placeholder pulse">Loading…</div>';
@@ -17,6 +35,7 @@ async function loadSkills() {
 }
 
 function renderSkills(skills) {
+  if (skillsMode !== 'installed') return;
   const grid = document.getElementById('skills-grid');
   if (!skills.length) {
     grid.innerHTML = '<div class="placeholder">No skills installed</div>';
@@ -25,7 +44,7 @@ function renderSkills(skills) {
   grid.innerHTML = skills.map(s => `
     <div class="skill-card fade-in ${s.enabled ? '' : 'disabled'}">
       <div class="skill-card-header">
-        <div class="skill-card-name">${s.name}</div>
+        <div class="skill-card-name" title="${s.name}">${s.name}</div>
         <label class="skill-toggle" title="${s.enabled ? 'Disable' : 'Enable'}">
           <input type="checkbox" ${s.enabled ? 'checked' : ''}
                  onchange="toggleSkill('${s.name}', this.checked)">
@@ -51,6 +70,75 @@ function filterSkills() {
   ));
 }
 
+/* ── Online search ───────────────────────────────────── */
+async function searchSkillsOnline() {
+  const q    = (document.getElementById('skill-search-input').value || '').trim();
+  const grid = document.getElementById('skills-grid');
+  if (!q) return;
+
+  grid.innerHTML = '<div class="placeholder pulse">Searching…</div>';
+
+  try {
+    const data    = await apiFetch(`/api/skills/search?q=${encodeURIComponent(q)}`);
+    let results   = data.results || [];
+
+    // Apply flag filters
+    const wantOfficial  = document.getElementById('flag-official').checked;
+    const wantCommunity = document.getElementById('flag-community').checked;
+    const wantUnknown   = document.getElementById('flag-unknown').checked;
+    const anyFlag       = wantOfficial || wantCommunity || wantUnknown;
+
+    if (anyFlag) {
+      results = results.filter(r => {
+        if (wantOfficial  && r.official)                     return true;
+        if (wantCommunity && r.community)                    return true;
+        if (wantUnknown   && !r.official && !r.community)    return true;
+        return false;
+      });
+    }
+
+    if (data.error || !results.length) {
+      grid.innerHTML = `<div class="placeholder">${data.error || 'No results found'}</div>`;
+      return;
+    }
+
+    const installed = new Set(allSkills.map(s => s.name));
+    grid.innerHTML = results.map(s => `
+      <div class="skill-card fade-in">
+        <div class="skill-card-header">
+          <div class="skill-card-name" title="${s.name}">${s.name}</div>
+          <div class="skill-trust-badges">${_skillTrustBadge(s)}</div>
+        </div>
+        ${s.version ? `<div class="skill-card-ver">v${s.version}</div>` : ''}
+        <div class="skill-card-desc">${s.description || '—'}</div>
+        <div class="skill-card-footer">
+          ${installed.has(s.name)
+            ? `<span class="badge badge-green" style="font-size:9px">Installed</span>`
+            : `<button class="skill-card-action" onclick="skillsInstallFromSearch('${s.name}', ${!s.official && !s.community})">Install</button>`
+          }
+          <span style="font-size:9px;color:var(--muted)">${s.source || ''}</span>
+        </div>
+      </div>
+    `).join('');
+  } catch (e) {
+    grid.innerHTML = `<div class="placeholder" style="color:var(--red)">${e.message}</div>`;
+  }
+}
+
+function _skillTrustBadge(s) {
+  if (s.official)  return '<span class="badge badge-green"  style="font-size:9px">Official</span>';
+  if (s.community) return '<span class="badge badge-blue"   style="font-size:9px">Community</span>';
+  return '<span class="badge" style="font-size:9px;background:var(--dim);color:var(--muted)">Unknown source</span>';
+}
+
+function skillsInstallFromSearch(name, isUnknown) {
+  if (isUnknown && !confirm(`"${name}" is from an unknown/unverified source.\nInstall anyway?`)) return;
+  skillsSetMode('installed');
+  document.getElementById('skill-input').value = name;
+  installSkill(false);
+}
+
+/* ── Install / Toggle / Detail / Remove ─────────────── */
 async function toggleSkill(name, enable) {
   try {
     await apiFetch(`/api/skills/${name}/toggle`, { method: 'POST' });
