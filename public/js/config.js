@@ -113,7 +113,8 @@ function buildConfigSidebar() {
       btn.title     = f.description + '\n' + f.path;
       btn.innerHTML = `<div class="config-file-name">${f.label}</div>
                        <div class="config-file-path">${f.path}</div>`;
-      btn.style.flex = '1';
+      btn.style.flex     = '1';
+      btn.style.minWidth = '0';   // allow text to truncate instead of pushing ✕ off-screen
       btn.onclick = () => cfgOpenFile(f.id);
 
       row.appendChild(btn);
