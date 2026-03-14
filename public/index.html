@@ -100,15 +100,15 @@
         <div style="font-size:9px;color:var(--muted);margin-top:4px">Changes apply immediately</div>
       </div>
       <div class="quicklinks">
-        <button class="quicklink" onclick="nav('controls')"><span class="quicklink-icon">▶</span><span class="quicklink-label">Controls</span></button>
-        <button class="quicklink" onclick="nav('config');  setTimeout(()=>cfgOpenFile('openclaw'),100)"><span class="quicklink-icon">⚙</span><span class="quicklink-label">openclaw.json</span></button>
-        <button class="quicklink" onclick="nav('config');  setTimeout(()=>cfgOpenFile('soul'),100)"><span class="quicklink-icon">👤</span><span class="quicklink-label">SOUL.md</span></button>
-        <button class="quicklink" onclick="nav('config');  setTimeout(()=>cfgOpenFile('compose'),100)"><span class="quicklink-icon">🐳</span><span class="quicklink-label">docker-compose.yml</span></button>
-        <button class="quicklink" onclick="nav('files');   setTimeout(()=>fmNavigate('/home/al/.openclaw'),200)"><span class="quicklink-icon">📁</span><span class="quicklink-label">.openclaw/</span></button>
-        <button class="quicklink" onclick="nav('logs')"><span class="quicklink-icon">📋</span><span class="quicklink-label">Logs</span></button>
-        <button class="quicklink" onclick="nav('keys')"><span class="quicklink-icon">🔑</span><span class="quicklink-label">API Keys</span></button>
-        <button class="quicklink" onclick="nav('snapshots')"><span class="quicklink-icon">📷</span><span class="quicklink-label">Snapshots</span></button>
-        <button class="quicklink" onclick="nav('code')"><span class="quicklink-icon">⬡</span><span class="quicklink-label">Code Tools</span></button>
+        <button class="quicklink" data-qnav="controls"  onclick="nav('controls')"><span class="quicklink-icon">▶</span><span class="quicklink-label">Controls</span></button>
+        <button class="quicklink" data-qnav="openclaw-json" onclick="nav('config');setTimeout(()=>cfgOpenFile('openclaw'),100)"><span class="quicklink-icon">⚙</span><span class="quicklink-label">openclaw.json</span></button>
+        <button class="quicklink" data-qnav="soul-md"   onclick="nav('config');setTimeout(()=>cfgOpenFile('soul'),100)"><span class="quicklink-icon">👤</span><span class="quicklink-label">SOUL.md</span></button>
+        <button class="quicklink" data-qnav="compose"   onclick="nav('config');setTimeout(()=>cfgOpenFile('compose'),100)"><span class="quicklink-icon">🐳</span><span class="quicklink-label">docker-compose.yml</span></button>
+        <button class="quicklink" data-qnav="openclaw-dir" onclick="nav('files');setTimeout(()=>fmNavigate('/home/al/.openclaw'),200)"><span class="quicklink-icon">📁</span><span class="quicklink-label">.openclaw/</span></button>
+        <button class="quicklink" data-qnav="logs"      onclick="nav('logs')"><span class="quicklink-icon">📋</span><span class="quicklink-label">Logs</span></button>
+        <button class="quicklink" data-qnav="keys"      onclick="nav('keys')"><span class="quicklink-icon">🔑</span><span class="quicklink-label">API Keys</span></button>
+        <button class="quicklink" data-qnav="snapshots" onclick="nav('snapshots')"><span class="quicklink-icon">📷</span><span class="quicklink-label">Snapshots</span></button>
+        <button class="quicklink" data-qnav="code"      onclick="nav('code')"><span class="quicklink-icon">⬡</span><span class="quicklink-label">Code Tools</span></button>
       </div>
     </div>
 
@@ -674,9 +674,17 @@
       <!-- Navigation Visibility -->
       <div class="card">
         <div class="card-title">Navigation Visibility</div>
-        <p style="font-size:11px;color:var(--muted);margin-bottom:14px">Show or hide tabs in the navigation bar. Changes take effect after saving.</p>
-        <div id="settings-tabs-list">
-          <div class="placeholder pulse">Loading…</div>
+        <div class="settings-nav-grid">
+          <div>
+            <div class="settings-col-title">Nav Tabs</div>
+            <p style="font-size:10px;color:var(--muted);margin-bottom:10px">Show or hide tabs in the top navigation bar.</p>
+            <div id="settings-tabs-list"><div class="placeholder pulse">Loading…</div></div>
+          </div>
+          <div>
+            <div class="settings-col-title">Quick Nav Items</div>
+            <p style="font-size:10px;color:var(--muted);margin-bottom:10px">Show or hide items in the sidebar Quick Nav.</p>
+            <div id="settings-qnav-list"><div class="placeholder pulse">Loading…</div></div>
+          </div>
         </div>
         <div class="toolbar" style="margin-top:14px">
           <button class="btn btn-sm btn-blue" onclick="settingsSave()">Save</button>

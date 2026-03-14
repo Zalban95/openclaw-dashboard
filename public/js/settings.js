@@ -17,13 +17,28 @@ const SETTINGS_TABS = [
   { id: 'docker',    label: 'Docker' },
 ];
 
-let _settingsHidden = [];
+const QUICK_NAV_ITEMS = [
+  { id: 'controls',      label: 'Controls' },
+  { id: 'openclaw-json', label: 'openclaw.json' },
+  { id: 'soul-md',       label: 'SOUL.md' },
+  { id: 'compose',       label: 'docker-compose.yml' },
+  { id: 'openclaw-dir',  label: '.openclaw/' },
+  { id: 'logs',          label: 'Logs' },
+  { id: 'keys',          label: 'API Keys' },
+  { id: 'snapshots',     label: 'Snapshots' },
+  { id: 'code',          label: 'Code Tools' },
+];
+
+let _settingsHidden  = [];
+let _quickNavHidden  = [];
 
 async function settingsInit() {
   try {
     const prefs = await apiFetch('/api/prefs');
-    _settingsHidden = prefs.hiddenTabs || [];
+    _settingsHidden = prefs.hiddenTabs  || [];
+    _quickNavHidden = prefs.quickNavHidden || [];
     _settingsRender();
+    _settingsQNavRender();
   } catch (e) {
     const el = document.getElementById('settings-tabs-list');
     if (el) el.innerHTML = `<div class="placeholder" style="color:var(--red)">${e.message}</div>`;
@@ -46,18 +61,43 @@ function _settingsRender() {
   `).join('');
 }
 
+function _settingsQNavRender() {
+  const list = document.getElementById('settings-qnav-list');
+  if (!list) return;
+  list.innerHTML = QUICK_NAV_ITEMS.map(t => `
+    <div class="settings-tab-row">
+      <label class="skill-toggle">
+        <input type="checkbox" id="settings-qnav-${t.id}"
+               ${!_quickNavHidden.includes(t.id) ? 'checked' : ''}>
+        <span class="skill-toggle-track"></span>
+      </label>
+      <span class="settings-tab-label">${t.label}</span>
+    </div>
+  `).join('');
+}
+
+function _applyQuickNav(hidden) {
+  document.querySelectorAll('.quicklink[data-qnav]').forEach(btn => {
+    btn.style.display = hidden.includes(btn.dataset.qnav) ? 'none' : '';
+  });
+}
+
 async function settingsSave() {
   const status = document.getElementById('settings-status');
   const hiddenTabs = SETTINGS_TABS
     .filter(t => !document.getElementById(`settings-show-${t.id}`)?.checked)
     .map(t => t.id);
+  const quickNavHidden = QUICK_NAV_ITEMS
+    .filter(t => !document.getElementById(`settings-qnav-${t.id}`)?.checked)
+    .map(t => t.id);
 
   try {
-    await apiFetch('/api/prefs', { method: 'POST', body: { hiddenTabs } });
-    setStatus(status, '✓ Saved — reload to apply', 'ok');
+    await apiFetch('/api/prefs', { method: 'POST', body: { hiddenTabs, quickNavHidden } });
+    setStatus(status, '✓ Saved', 'ok');
     _settingsHidden = hiddenTabs;
+    _quickNavHidden = quickNavHidden;
     _applyHiddenTabs(hiddenTabs);
-    // Sync the quick menu panel
+    _applyQuickNav(quickNavHidden);
     _sidebarTabTogglesRender();
   } catch (e) {
     setStatus(status, `✗ ${e.message}`, 'err');
@@ -72,12 +112,14 @@ function _applyHiddenTabs(hiddenTabs) {
   });
 }
 
-/* Called on app startup to apply persisted hidden tabs */
+/* Called on app startup to apply persisted hidden tabs and quick nav */
 async function settingsApplyOnLoad() {
   try {
     const prefs = await apiFetch('/api/prefs');
-    _settingsHidden = prefs.hiddenTabs || [];
+    _settingsHidden = prefs.hiddenTabs     || [];
+    _quickNavHidden = prefs.quickNavHidden || [];
     _applyHiddenTabs(_settingsHidden);
+    _applyQuickNav(_quickNavHidden);
   } catch {}
 }
 

@@ -1505,6 +1505,7 @@ const SYSTEM_TOOLS = [
     repoLabel: 'npm: node-pty',
     installCmd: 'npm install node-pty',
     installCwd: __dirname,
+    detectCwd:  __dirname,
   },
   {
     id: 'docker',
@@ -1530,7 +1531,7 @@ const SYSTEM_TOOLS = [
     id: 'python3',
     label: 'Python 3',
     category: 'recommended',
-    detectCmd: 'python3 --version 2>/dev/null',
+    detectCmd: 'python3 --version 2>/dev/null || python --version 2>/dev/null',
     note: 'Required for Python-based AI tools (Aider, Whisper, Kokoro)',
     repo: 'https://python.org',
     repoLabel: 'apt: python3',
@@ -1540,7 +1541,7 @@ const SYSTEM_TOOLS = [
     id: 'pip',
     label: 'pip',
     category: 'recommended',
-    detectCmd: 'pip3 --version 2>/dev/null || pip --version 2>/dev/null',
+    detectCmd: 'PATH="$HOME/.local/bin:$PATH" pip3 --version 2>/dev/null || PATH="$HOME/.local/bin:$PATH" pip --version 2>/dev/null || python3 -m pip --version 2>/dev/null',
     note: 'Python package manager — required for AI tools',
     repo: 'https://pip.pypa.io',
     repoLabel: 'apt: python3-pip',
@@ -1560,18 +1561,18 @@ const SYSTEM_TOOLS = [
     id: 'huggingface-cli',
     label: 'huggingface-cli',
     category: 'optional',
-    detectCmd: 'huggingface-cli --version 2>/dev/null || python3 -m huggingface_hub.commands.huggingface_cli --version 2>/dev/null',
+    detectCmd: 'PATH="$HOME/.local/bin:$PATH" huggingface-cli --version 2>/dev/null || python3 -c "import huggingface_hub; print(huggingface_hub.__version__)" 2>/dev/null',
     note: 'HuggingFace Hub CLI — for downloading local models',
     repo: 'https://pypi.org/project/huggingface-hub/',
     repoLabel: 'pip: huggingface-hub',
-    installCmd: 'python3 -m pip install --user huggingface-hub || python3 -m pip install --break-system-packages huggingface-hub',
+    installCmd: 'PATH="$HOME/.local/bin:$PATH" python3 -m pip install --user huggingface-hub || python3 -m pip install --break-system-packages huggingface-hub',
   },
 ];
 
 app.get('/api/system/tools', async (req, res) => {
   const results = await Promise.all(SYSTEM_TOOLS.map(t => new Promise(resolve => {
     exec(`bash -lc "${t.detectCmd.replace(/"/g, '\\"')}"`,
-      { env: { ...process.env, HOME: process.env.HOME || os.homedir() }, timeout: 5000 },
+      { env: { ...process.env, HOME: process.env.HOME || os.homedir() }, cwd: t.detectCwd || undefined, timeout: 5000 },
       (err, stdout) => {
         const out      = stdout.trim();
         const detected = !err && !!out && out !== '' && out.toLowerCase() !== 'undefined';

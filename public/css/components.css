@@ -587,6 +587,21 @@
 }
 .snap-path-with-btn .input { min-width: 0; }
 
+/* ── Settings 2-column nav grid ──────────────────────── */
+.settings-nav-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 20px;
+}
+.settings-col-title {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
 /* ── Controls tab — container rows ──────────────────── */
 .ctrl-container-row {
   display: grid;

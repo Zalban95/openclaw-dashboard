@@ -34,6 +34,7 @@
   flex-shrink: 0;
   overflow: hidden;
   background: #0d1117;
+  margin: 0 4px;
 }
 
 .term-session-header {
@@ -61,7 +62,7 @@
 
 /* Fixed-height terminal container per session */
 .term-session-container {
-  height: 220px;
+  height: 204px;
   padding: 4px 6px;
   box-sizing: border-box;
   overflow: hidden;
