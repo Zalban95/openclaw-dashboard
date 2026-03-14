@@ -791,20 +791,23 @@ app.get('/api/code/tools', async (req, res) => {
   // #region agent log
   const _execPath = process.env.PATH || '(empty)';
   const _logFile = require('path').join(__dirname, 'debug-e82941.log');
-  require('fs').appendFileSync(_logFile, JSON.stringify({sessionId:'e82941',location:'server.js:code-tools',message:'PATH env for exec',data:{PATH:_execPath},timestamp:Date.now(),runId:'post-fix',hypothesisId:'H4'})+'\n');
+  require('fs').appendFileSync(_logFile, JSON.stringify({sessionId:'e82941',location:'server.js:code-tools',message:'PATH env for exec',data:{PATH:_execPath},timestamp:Date.now(),runId:'post-fix2',hypothesisId:'H4'})+'\n');
   // #endregion
 
   const results = await Promise.all(CODE_TOOLS.map(t => new Promise(resolve => {
-    // Try login shell first, fall back to searching common npm/pip/nvm paths directly
+    // Use test -f for static paths so each step exits 1 (not found) keeping the || chain alive.
+    // find...| head -1 exits 0 even when empty, which would wrongly stop the chain.
     const detectCmd = [
-      `bash -lc "which ${t.cmd} 2>/dev/null || command -v ${t.cmd} 2>/dev/null"`,
-      `find "$HOME/.nvm/versions" -name "${t.cmd}" -type f 2>/dev/null | head -1`,
-      `find "$HOME/.npm-global/bin" "$HOME/.local/bin" "/usr/local/bin" -name "${t.cmd}" -maxdepth 1 2>/dev/null | head -1`,
+      `bash -lc "which ${t.cmd} 2>/dev/null"`,
+      `{ test -f "$HOME/.npm-global/bin/${t.cmd}" && echo "$HOME/.npm-global/bin/${t.cmd}"; }`,
+      `{ test -f "$HOME/.local/bin/${t.cmd}"      && echo "$HOME/.local/bin/${t.cmd}"; }`,
+      `{ test -f "/usr/local/bin/${t.cmd}"        && echo "/usr/local/bin/${t.cmd}"; }`,
+      `find "$HOME/.nvm/versions" -name "${t.cmd}" -type f 2>/dev/null | grep -m1 .`,
     ].join(' || ');
     exec(detectCmd, { env: { ...process.env, HOME: process.env.HOME || require('os').homedir() } }, (err, stdout, stderr) => {
       const detected = !!stdout.trim();
       // #region agent log
-      require('fs').appendFileSync(_logFile, JSON.stringify({sessionId:'e82941',location:'server.js:code-tools-exec',message:'tool detection result',data:{cmd:t.cmd,err:err?.message,stdout:stdout?.trim(),stderr:stderr?.trim(),detected},timestamp:Date.now(),runId:'post-fix',hypothesisId:'H4-H5'})+'\n');
+      require('fs').appendFileSync(_logFile, JSON.stringify({sessionId:'e82941',location:'server.js:code-tools-exec',message:'tool detection result',data:{cmd:t.cmd,err:err?.message,stdout:stdout?.trim(),stderr:stderr?.trim(),detected},timestamp:Date.now(),runId:'post-fix2',hypothesisId:'H4-H5'})+'\n');
       // #endregion
       let version = null;
       if (detected) {
