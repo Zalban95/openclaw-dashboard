@@ -837,7 +837,7 @@ const CODE_TOOLS = [
   { id: 'claude', label: 'Claude Code', cmd: 'claude', installHint: 'npm install -g @anthropic-ai/claude-code', url: 'https://github.com/anthropics/claude-code' },
   { id: 'aider',  label: 'Aider',       cmd: 'aider',  installHint: 'sudo pip install --break-system-packages aider-install && aider-install', url: 'https://aider.chat' },
   { id: 'codex',  label: 'OpenAI Codex CLI', cmd: 'codex', installHint: 'npm install -g @openai/codex', url: 'https://github.com/openai/codex' },
-  { id: 'goose',  label: 'Goose',       cmd: 'goose',  installHint: 'sudo pip install --break-system-packages goose-ai', url: 'https://github.com/block/goose' },
+  { id: 'goose',  label: 'Goose',       cmd: 'goose',  installHint: 'curl -fsSL https://github.com/block/goose/releases/download/stable/download_cli.sh | bash', url: 'https://block.github.io/goose/docs/getting-started/installation/' },
 ];
 
 app.get('/api/code/tools', async (req, res) => {
@@ -1634,6 +1634,7 @@ app.get('/api/system/tools', async (req, res) => {
           repo:         t.repo,
           repoLabel:    t.repoLabel,
           canInstall:   !!t.installCmd,
+          installCmd:   t.installCmd || null,
           detected,
           version,
         });
