@@ -2233,18 +2233,18 @@ app.delete('/api/docker/images/:id', (req, res) => {
 // Pre-configured Docker-based inference backends, named doca-{id} when running.
 
 const INFERENCE_SERVICES = [
-  // Whisper: ghcr.io tag includes CUDA support; -cuda suffix required for GPU
-  { id: 'whisper',  label: 'Whisper STT',     image: 'ghcr.io/fedirz/faster-whisper-server:latest-cuda', port: 8000, internalPort: 8000, apiPath: '/v1',       multiGpu: false,
+  // Whisper: Docker Hub, fedirz/faster-whisper-server — CUDA tag for GPU
+  { id: 'whisper',  label: 'Whisper STT',     image: 'fedirz/faster-whisper-server:latest-cuda', port: 8000, internalPort: 8000, apiPath: '/v1', multiGpu: false,
     description: 'OpenAI-compatible speech-to-text API (faster-whisper, CUDA)' },
-  // vLLM: official Docker Hub image, OpenAI-compatible
-  { id: 'vllm',     label: 'vLLM (LLM)',      image: 'vllm/vllm-openai:latest',      port: 8001, internalPort: 8000, apiPath: '/v1',       multiGpu: true,
+  // vLLM: Docker Hub, official OpenAI-compatible server
+  { id: 'vllm',     label: 'vLLM (LLM)',      image: 'vllm/vllm-openai:latest',      port: 8001, internalPort: 8000, apiPath: '/v1', multiGpu: true,
     description: 'OpenAI-compatible LLM inference for HuggingFace models, multi-GPU' },
-  // Stable Diffusion: ai-dock image is well-maintained, supports GPU, runs AUTOMATIC1111 WebUI
-  { id: 'sdwebui',  label: 'Stable Diffusion',image: 'ghcr.io/ai-dock/stable-diffusion-webui:v2-cuda-11.8.0-base', port: 7860, internalPort: 7860, apiPath: '/sdapi/v1', multiGpu: false,
+  // Stable Diffusion: ai-dock GHCR — AUTOMATIC1111 WebUI with CUDA
+  { id: 'sdwebui',  label: 'Stable Diffusion',image: 'ghcr.io/ai-dock/stable-diffusion-webui:latest-cuda', port: 7860, internalPort: 7860, apiPath: '/sdapi/v1', multiGpu: false,
     description: 'Stable Diffusion AUTOMATIC1111 WebUI with REST API (ai-dock)' },
-  // ComfyUI: ai-dock image, GPU-ready
-  { id: 'comfyui',  label: 'ComfyUI',         image: 'ghcr.io/ai-dock/comfyui:latest-cuda', port: 8188, internalPort: 8188, apiPath: '',  multiGpu: false,
-    description: 'Node-based Stable Diffusion workflow runner (ai-dock)' },
+  // ComfyUI: Docker Hub, mmartial — NVIDIA GPU ready with ComfyUI-Manager
+  { id: 'comfyui',  label: 'ComfyUI',         image: 'mmartial/comfyui-nvidia-docker:latest', port: 8188, internalPort: 8188, apiPath: '', multiGpu: false,
+    description: 'Node-based Stable Diffusion workflow runner with ComfyUI-Manager' },
 ];
 
 app.get('/api/services', (req, res) => {
