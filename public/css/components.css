@@ -653,3 +653,33 @@
 }
 .sysdep-repo:hover { text-decoration: underline; }
 .sysdep-manual { font-size: 10px; color: var(--muted); font-style: italic; }
+
+/* ── Inference Services ─────────────────────────────── */
+.services-row {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  background: var(--bg2);
+}
+.services-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.services-label  { font-weight: 600; font-size: 13px; }
+.services-image  { font-size: 10px; color: var(--muted); font-family: var(--font-mono); }
+.services-url    { font-size: 11px; color: var(--accent); text-decoration: none; }
+.services-url:hover { text-decoration: underline; }
+.services-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+.services-ctrl-label { font-size: 11px; color: var(--muted); white-space: nowrap; }
+.services-select { padding: 3px 6px; font-size: 12px; }
+.services-model-input { font-size: 12px; padding: 3px 8px; }
+.badge-grey { background: var(--bg3); color: var(--muted); }

@@ -89,9 +89,15 @@
     </div>
 
     <!-- HuggingFace cached models -->
-    <div class="sidebar-section grow">
+    <div class="sidebar-section">
       <div class="sec-label">HuggingFace Models</div>
       <div id="s-hf-models"><div class="placeholder">Loading…</div></div>
+    </div>
+
+    <!-- Running inference services -->
+    <div class="sidebar-section grow">
+      <div class="sec-label">Inference Services</div>
+      <div id="s-services"><div class="placeholder">Loading…</div></div>
     </div>
 
 
@@ -599,6 +605,14 @@
         </div>
       </div>
 
+      <!-- Inference Services -->
+      <div class="card">
+        <div class="card-title">Inference Services</div>
+        <p style="font-size:11px;color:var(--muted);margin:0 0 8px">
+          Launch Docker-based inference backends. Services are named <code>doca-{id}</code> and auto-registered in Tool APIs on start.
+        </p>
+        <div id="services-grid"><div class="placeholder pulse" style="padding:12px">Loading…</div></div>
+      </div>
 
     </div>
 
@@ -804,6 +818,7 @@
 <script src="js/chat.js"></script>
 <script src="js/terminal.js"></script>
 <script src="js/models.js"></script>
+<script src="js/services.js"></script>
 <script src="js/docker.js"></script>
 <script src="js/sudo.js"></script>
 <script src="js/settings.js"></script>

@@ -10,6 +10,7 @@ async function modelsInit() {
   modelsLoadList();
   nlmInit();
   hfInit();
+  if (typeof servicesInit === 'function') servicesInit();
 }
 
 /* ── Settings ─────────────────────────────────────────── */

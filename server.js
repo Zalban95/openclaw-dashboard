@@ -2229,6 +2229,120 @@ app.delete('/api/docker/images/:id', (req, res) => {
   });
 });
 
+// ─── INFERENCE SERVICES ───────────────────────────────────────────────────────
+// Pre-configured Docker-based inference backends, named doca-{id} when running.
+
+const INFERENCE_SERVICES = [
+  { id: 'whisper',  label: 'Whisper STT',     image: 'fedirz/faster-whisper-server', port: 8000, internalPort: 8000, apiPath: '/v1',       multiGpu: false,
+    description: 'OpenAI-compatible speech-to-text API' },
+  { id: 'vllm',     label: 'vLLM  (LLM)',     image: 'vllm/vllm-openai',             port: 8001, internalPort: 8000, apiPath: '/v1',       multiGpu: true,
+    description: 'OpenAI-compatible LLM inference, supports HuggingFace models' },
+  { id: 'sdwebui',  label: 'Stable Diffusion',image: 'ghcr.io/automatic1111/stable-diffusion-webui:latest', port: 7860, internalPort: 7860, apiPath: '/sdapi/v1', multiGpu: false,
+    description: 'Stable Diffusion image generation with REST API' },
+  { id: 'comfyui',  label: 'ComfyUI',         image: 'yanwk/comfyui-boot:latest',    port: 8188, internalPort: 8188, apiPath: '',          multiGpu: false,
+    description: 'Node-based SD workflow runner' },
+];
+
+app.get('/api/services', (req, res) => {
+  res.json({ services: INFERENCE_SERVICES.map(s => ({ id: s.id, label: s.label, image: s.image, port: s.port, apiPath: s.apiPath, description: s.description, multiGpu: s.multiGpu })) });
+});
+
+app.get('/api/services/status', (req, res) => {
+  exec(`docker ps -a --filter "name=doca-" --format '{{json .}}'`, (err, stdout) => {
+    const running = {};
+    (stdout || '').trim().split('\n').filter(Boolean).forEach(line => {
+      try {
+        const c = JSON.parse(line);
+        const svc = INFERENCE_SERVICES.find(s => c.Names === `doca-${s.id}`);
+        if (svc) running[svc.id] = { state: c.State, status: c.Status, id: c.ID };
+      } catch {}
+    });
+    res.json({ running });
+  });
+});
+
+app.post('/api/services/start', (req, res) => {
+  const { id, gpu, modelId } = req.body;
+  const svc = INFERENCE_SERVICES.find(s => s.id === id);
+  if (!svc) return res.status(400).json({ error: 'Unknown service' });
+
+  sseHeaders(res);
+  const sseWrite = d => { try { res.write(`data: ${JSON.stringify(d)}\n\n`); } catch {} };
+
+  const mp   = loadModelsPrefs();
+  const home = process.env.HOME || os.homedir();
+  const hfCache = mp.hf?.cacheDir || path.join(home, '.cache', 'huggingface', 'hub');
+  const hfToken = mp.hf?.token || '';
+
+  // GPU flag
+  let gpuFlag = '';
+  if      (gpu === 'all') gpuFlag = '--gpus all';
+  else if (gpu === '0')   gpuFlag = '--gpus \'"device=0"\'';
+  else if (gpu === '1')   gpuFlag = '--gpus \'"device=1"\'';
+
+  // Base docker run args
+  const dockerArgs = [
+    'run', '-d',
+    '--name', `doca-${id}`,
+    '--restart', 'unless-stopped',
+    '-p', `${svc.port}:${svc.internalPort}`,
+  ];
+  if (gpuFlag) dockerArgs.push(...gpuFlag.split(' '));
+
+  // Service-specific extras
+  if (id === 'vllm') {
+    dockerArgs.push('-v', `${hfCache}:/root/.cache/huggingface`);
+    if (hfToken) dockerArgs.push('-e', `HUGGING_FACE_HUB_TOKEN=${hfToken}`);
+    dockerArgs.push(svc.image);
+    if (modelId) dockerArgs.push('--model', modelId);
+    if (gpu === 'all' && svc.multiGpu) dockerArgs.push('--tensor-parallel-size', '2');
+  } else if (id === 'sdwebui') {
+    dockerArgs.push('-v', `${hfCache}:/root/.cache/huggingface`);
+    dockerArgs.push(svc.image);
+    dockerArgs.push('--listen', '--api');
+  } else if (id === 'comfyui') {
+    dockerArgs.push('-v', `${hfCache}:/root/.cache/huggingface`);
+    dockerArgs.push(svc.image);
+  } else {
+    dockerArgs.push(svc.image);
+  }
+
+  const cmdDisplay = `docker ${dockerArgs.join(' ')}`;
+  sseWrite({ status: `Starting ${svc.label}…\n$ ${cmdDisplay}\n` });
+
+  const child = spawn('docker', dockerArgs, { cwd: home });
+  child.stdout.on('data', d => sseWrite({ status: d.toString() }));
+  child.stderr.on('data', d => sseWrite({ status: d.toString() }));
+  child.on('close', (code, signal) => {
+    const ok  = code === 0;
+    const msg = ok ? `✓ ${svc.label} started on http://localhost:${svc.port}`
+      : code !== null ? `✗ Exit ${code}` : `✗ Killed (${signal || 'unknown'})`;
+    sseWrite({ done: true, ok, status: msg });
+    if (ok) {
+      // Auto-register the service URL in Tool APIs
+      try {
+        const cfg = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
+        if (!cfg.toolProviders) cfg.toolProviders = {};
+        cfg.toolProviders[id] = { baseUrl: `http://localhost:${svc.port}`, apiKey: '' };
+        fs.writeFileSync(CONFIG_PATH, JSON.stringify(cfg, null, 2), 'utf8');
+      } catch {}
+    }
+    res.end();
+  });
+  child.on('error', e => { sseWrite({ done: true, ok: false, status: `Error: ${e.message}` }); res.end(); });
+  res.on('close', () => { if (!child.killed) child.kill(); });
+});
+
+app.post('/api/services/stop', (req, res) => {
+  const { id } = req.body;
+  const svc = INFERENCE_SERVICES.find(s => s.id === id);
+  if (!svc) return res.status(400).json({ error: 'Unknown service' });
+  exec(`docker stop doca-${id} && docker rm doca-${id}`, (err, stdout, stderr) => {
+    if (err) return res.status(500).json({ error: stderr || err.message });
+    res.json({ ok: true });
+  });
+});
+
 // ─── Start ────────────────────────────────────────────────────────────────────
 httpServer.listen(PORT, '0.0.0.0', () => {
   console.log(`OpenClaw Panel v2.1 → http://0.0.0.0:${PORT}`);

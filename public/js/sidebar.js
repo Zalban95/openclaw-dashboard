@@ -12,9 +12,34 @@ async function pollStatus() {
     renderSystem(data.system || null);
     renderModels(data.models || [], data.loadedModels || []);
     renderHfModels(data.hfModels || []);
+    pollServicesStatus();
 
   } catch {
     document.getElementById('dot').className = 'dot';
+  }
+}
+
+async function pollServicesStatus() {
+  const el = document.getElementById('s-services');
+  if (!el) return;
+  try {
+    const data = await apiFetch('/api/services/status');
+    const running = data.running || {};
+    const keys = Object.keys(running).filter(k => running[k]?.state === 'running');
+    if (!keys.length) {
+      el.innerHTML = '<div class="placeholder">None running</div>';
+      return;
+    }
+    el.innerHTML = keys.map(id =>
+      `<div class="model-item">
+        <span class="dot on" style="width:7px;height:7px;flex-shrink:0"></span>
+        <span class="model-name">${id}</span>
+       </div>`
+    ).join('');
+    // Also keep services.js in sync if the tab is open
+    if (typeof servicesLoadStatus === 'function') servicesLoadStatus();
+  } catch {
+    el.innerHTML = '<div class="placeholder">—</div>';
   }
 }
 
