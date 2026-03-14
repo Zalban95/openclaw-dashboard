@@ -32,6 +32,10 @@ function _renderServicesGrid() {
 
   grid.innerHTML = _servicesDefs.map(svc => {
     const isVllm = svc.id === 'vllm';
+    const g      = svc.savedGpu || 'all';
+    const gpuOpts = ['0','1','all',''].map(v =>
+      `<option value="${v}"${g===v?' selected':''}>${v==='all'?'Both GPUs':v===''?'No GPU (CPU)':`GPU ${v}`}</option>`
+    ).join('');
     return `
     <div class="services-row" id="svc-row-${svc.id}">
       <div class="services-header">
@@ -47,16 +51,15 @@ function _renderServicesGrid() {
       <div style="font-size:10px;color:var(--muted);margin:2px 0 6px">${svc.description}</div>
       <div class="services-controls">
         <label class="services-ctrl-label">GPU</label>
-        <select class="input services-select" id="svc-gpu-${svc.id}" style="width:130px">
-          <option value="0">GPU 0</option>
-          <option value="1">GPU 1</option>
-          <option value="all">Both GPUs</option>
-          <option value="">No GPU (CPU)</option>
-        </select>
+        <select class="input services-select" id="svc-gpu-${svc.id}" style="width:130px"
+                onchange="_svcSaveSettings('${svc.id}')">${gpuOpts}</select>
         ${isVllm ? `
         <label class="services-ctrl-label">Model ID</label>
         <input class="input services-model-input" id="svc-model-${svc.id}"
-               placeholder="e.g. meta-llama/Llama-3.2-1B" style="flex:1;min-width:180px">
+               placeholder="e.g. Qwen/Qwen2.5-7B-Instruct"
+               value="${svc.savedModelId || ''}"
+               style="flex:1;min-width:180px"
+               onchange="_svcSaveSettings('${svc.id}')">
         ` : ''}
         <button class="btn btn-sm btn-teal"  id="svc-start-${svc.id}" onclick="serviceStart('${svc.id}')">▶ Start</button>
         <button class="btn btn-sm btn-red"   id="svc-stop-${svc.id}"  onclick="serviceStop('${svc.id}')"  style="display:none">■ Stop</button>
@@ -96,6 +99,12 @@ function _updateServicesBadges() {
       if (stopBtn)  stopBtn.style.display  = 'none';
     }
   });
+}
+
+async function _svcSaveSettings(id) {
+  const gpu     = document.getElementById(`svc-gpu-${id}`)?.value   ?? 'all';
+  const modelId = document.getElementById(`svc-model-${id}`)?.value ?? '';
+  try { await apiFetch('/api/services/settings', { method: 'POST', body: { id, gpu, modelId } }); } catch {}
 }
 
 /* ── Actions ────────────────────────────────────────── */

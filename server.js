@@ -2233,18 +2233,41 @@ app.delete('/api/docker/images/:id', (req, res) => {
 // Pre-configured Docker-based inference backends, named doca-{id} when running.
 
 const INFERENCE_SERVICES = [
-  { id: 'whisper',  label: 'Whisper STT',     image: 'fedirz/faster-whisper-server', port: 8000, internalPort: 8000, apiPath: '/v1',       multiGpu: false,
-    description: 'OpenAI-compatible speech-to-text API' },
-  { id: 'vllm',     label: 'vLLM  (LLM)',     image: 'vllm/vllm-openai',             port: 8001, internalPort: 8000, apiPath: '/v1',       multiGpu: true,
-    description: 'OpenAI-compatible LLM inference, supports HuggingFace models' },
-  { id: 'sdwebui',  label: 'Stable Diffusion',image: 'ghcr.io/automatic1111/stable-diffusion-webui:latest', port: 7860, internalPort: 7860, apiPath: '/sdapi/v1', multiGpu: false,
-    description: 'Stable Diffusion image generation with REST API' },
-  { id: 'comfyui',  label: 'ComfyUI',         image: 'yanwk/comfyui-boot:latest',    port: 8188, internalPort: 8188, apiPath: '',          multiGpu: false,
-    description: 'Node-based SD workflow runner' },
+  // Whisper: ghcr.io tag includes CUDA support; -cuda suffix required for GPU
+  { id: 'whisper',  label: 'Whisper STT',     image: 'ghcr.io/fedirz/faster-whisper-server:latest-cuda', port: 8000, internalPort: 8000, apiPath: '/v1',       multiGpu: false,
+    description: 'OpenAI-compatible speech-to-text API (faster-whisper, CUDA)' },
+  // vLLM: official Docker Hub image, OpenAI-compatible
+  { id: 'vllm',     label: 'vLLM (LLM)',      image: 'vllm/vllm-openai:latest',      port: 8001, internalPort: 8000, apiPath: '/v1',       multiGpu: true,
+    description: 'OpenAI-compatible LLM inference for HuggingFace models, multi-GPU' },
+  // Stable Diffusion: ai-dock image is well-maintained, supports GPU, runs AUTOMATIC1111 WebUI
+  { id: 'sdwebui',  label: 'Stable Diffusion',image: 'ghcr.io/ai-dock/stable-diffusion-webui:v2-cuda-11.8.0-base', port: 7860, internalPort: 7860, apiPath: '/sdapi/v1', multiGpu: false,
+    description: 'Stable Diffusion AUTOMATIC1111 WebUI with REST API (ai-dock)' },
+  // ComfyUI: ai-dock image, GPU-ready
+  { id: 'comfyui',  label: 'ComfyUI',         image: 'ghcr.io/ai-dock/comfyui:latest-cuda', port: 8188, internalPort: 8188, apiPath: '',  multiGpu: false,
+    description: 'Node-based Stable Diffusion workflow runner (ai-dock)' },
 ];
 
 app.get('/api/services', (req, res) => {
-  res.json({ services: INFERENCE_SERVICES.map(s => ({ id: s.id, label: s.label, image: s.image, port: s.port, apiPath: s.apiPath, description: s.description, multiGpu: s.multiGpu })) });
+  const prefs = loadPrefs();
+  const saved = prefs.serviceSettings || {};
+  res.json({ services: INFERENCE_SERVICES.map(s => ({
+    id: s.id, label: s.label, image: s.image, port: s.port,
+    apiPath: s.apiPath, description: s.description, multiGpu: s.multiGpu,
+    savedGpu: saved[s.id]?.gpu || 'all',
+    savedModelId: saved[s.id]?.modelId || '',
+  })) });
+});
+
+app.post('/api/services/settings', (req, res) => {
+  const { id, gpu, modelId } = req.body;
+  if (!id) return res.status(400).json({ error: 'id required' });
+  try {
+    const prefs = loadPrefs();
+    if (!prefs.serviceSettings) prefs.serviceSettings = {};
+    prefs.serviceSettings[id] = { gpu: gpu || 'all', modelId: modelId || '' };
+    fs.writeFileSync(PREFS_FILE, JSON.stringify(prefs, null, 2), 'utf8');
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.get('/api/services/status', (req, res) => {
@@ -2266,6 +2289,14 @@ app.post('/api/services/start', (req, res) => {
   const svc = INFERENCE_SERVICES.find(s => s.id === id);
   if (!svc) return res.status(400).json({ error: 'Unknown service' });
 
+  // Persist settings so user doesn't have to re-enter next time
+  try {
+    const prefs = loadPrefs();
+    if (!prefs.serviceSettings) prefs.serviceSettings = {};
+    prefs.serviceSettings[id] = { gpu: gpu || 'all', modelId: modelId || '' };
+    fs.writeFileSync(PREFS_FILE, JSON.stringify(prefs, null, 2), 'utf8');
+  } catch {}
+
   sseHeaders(res);
   const sseWrite = d => { try { res.write(`data: ${JSON.stringify(d)}\n\n`); } catch {} };
 
@@ -2274,20 +2305,16 @@ app.post('/api/services/start', (req, res) => {
   const hfCache = mp.hf?.cacheDir || path.join(home, '.cache', 'huggingface', 'hub');
   const hfToken = mp.hf?.token || '';
 
-  // GPU flag
-  let gpuFlag = '';
-  if      (gpu === 'all') gpuFlag = '--gpus all';
-  else if (gpu === '0')   gpuFlag = '--gpus \'"device=0"\'';
-  else if (gpu === '1')   gpuFlag = '--gpus \'"device=1"\'';
-
-  // Base docker run args
+  // Base docker run args — GPU arg passed directly to spawn (no shell quoting)
   const dockerArgs = [
     'run', '-d',
     '--name', `doca-${id}`,
     '--restart', 'unless-stopped',
     '-p', `${svc.port}:${svc.internalPort}`,
   ];
-  if (gpuFlag) dockerArgs.push(...gpuFlag.split(' '));
+  if      (gpu === 'all') dockerArgs.push('--gpus', 'all');
+  else if (gpu === '0')   dockerArgs.push('--gpus', 'device=0');
+  else if (gpu === '1')   dockerArgs.push('--gpus', 'device=1');
 
   // Service-specific extras
   if (id === 'vllm') {
