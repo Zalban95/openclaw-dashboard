@@ -406,14 +406,11 @@
 
 /* ── Settings tab ────────────────────────────────────── */
 .settings-tab-row {
-  display: flex; align-items: center;
+  display: flex; align-items: center; gap: 10px;
   padding: 7px 0; border-bottom: 1px solid var(--border);
 }
 .settings-tab-row:last-child { border-bottom: none; }
-.settings-tab-toggle {
-  display: flex; align-items: center; gap: 10px; cursor: pointer;
-}
-.settings-tab-label { font-size: 13px; }
+.settings-tab-label { font-size: 13px; cursor: default; }
 
 /* ── Tool API rows ───────────────────────────────────── */
 .tool-api-row {

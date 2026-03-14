@@ -103,6 +103,9 @@ async function claudeCheckStatus() {
   const version = document.getElementById('claude-version');
   const stopBtn = document.getElementById('claude-stop-btn');
 
+  // Elements may not exist if the tab layout changed
+  if (!badge) return;
+
   badge.textContent = 'Checking…';
   badge.className   = 'badge badge-blue';
 
@@ -111,19 +114,19 @@ async function claudeCheckStatus() {
     if (data.available) {
       badge.textContent = 'Available';
       badge.className   = 'badge badge-green';
-      version.textContent = data.version || '';
+      if (version) version.textContent = data.version || '';
     } else {
       badge.textContent = 'Not found';
       badge.className   = 'badge badge-red';
-      version.textContent = 'claude CLI not in PATH';
+      if (version) version.textContent = 'claude CLI not in PATH';
     }
     claudeRunning = data.running;
-    stopBtn.style.display = data.running ? 'inline-flex' : 'none';
+    if (stopBtn) stopBtn.style.display = data.running ? 'inline-flex' : 'none';
     _claudeUpdateInputMode();
   } catch (e) {
     badge.textContent = 'Error';
     badge.className   = 'badge badge-red';
-    version.textContent = e.message;
+    if (version) version.textContent = e.message;
   }
 }
 

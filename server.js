@@ -795,7 +795,7 @@ app.get('/api/code/tools', async (req, res) => {
   // #endregion
 
   const results = await Promise.all(CODE_TOOLS.map(t => new Promise(resolve => {
-    exec(`which ${t.cmd} 2>/dev/null || where ${t.cmd} 2>/dev/null`, (err, stdout, stderr) => {
+    exec(`bash -lc "which ${t.cmd} 2>/dev/null || command -v ${t.cmd} 2>/dev/null"`, (err, stdout, stderr) => {
       const detected = !err && !!stdout.trim();
       // #region agent log
       require('fs').appendFileSync(_logFile, JSON.stringify({sessionId:'e82941',location:'server.js:code-tools-exec',message:'tool detection result',data:{cmd:t.cmd,err:err?.message,stdout:stdout?.trim(),stderr:stderr?.trim(),detected},timestamp:Date.now(),runId:'run1',hypothesisId:'H4-H5'})+'\n');
@@ -803,7 +803,7 @@ app.get('/api/code/tools', async (req, res) => {
       let version = null;
       if (detected) {
         try {
-          const vOut = require('child_process').execSync(`${t.cmd} --version 2>/dev/null`, { timeout: 3000 }).toString().trim();
+          const vOut = require('child_process').execSync(`bash -lc "${t.cmd} --version 2>/dev/null"`, { timeout: 3000 }).toString().trim();
           version = vOut.split('\n')[0].slice(0, 60);
         } catch {}
       }
