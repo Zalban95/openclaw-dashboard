@@ -141,7 +141,7 @@ header {
 .tab-page {
   display: none;
   flex: 1;
-  overflow: hidden;
+  overflow-y: auto;
   flex-direction: column;
   padding: 16px;
   gap: 12px;
