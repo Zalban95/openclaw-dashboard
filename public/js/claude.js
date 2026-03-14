@@ -58,6 +58,8 @@ function _codeRender() {
             <input class="input flex1" id="code-cfg-${t.id}"
                    value="${(t.configPath || '').replace(/"/g, '&quot;')}"
                    placeholder="e.g. ~/.aider.conf.yml">
+            <button class="btn btn-xs" title="Browse" onclick="event.stopPropagation(); fpOpen('code-cfg-${t.id}')">📁</button>
+            <button class="btn btn-xs" title="Edit in file manager" onclick="event.stopPropagation(); codeConfigEdit('${t.id}')">✎</button>
             <button class="btn btn-xs" onclick="codeConfigSave('${t.id}')">Save</button>
           </div>
           ${t.detected
@@ -73,8 +75,10 @@ function _codeRender() {
                </div>`
             : `<div class="code-tool-missing">
                  <span>Not installed — </span>
-                 <a href="${t.url}" target="_blank" class="btn btn-xs">Install…</a>
+                 <button class="btn btn-xs btn-green" onclick="event.stopPropagation(); codeToolInstall('${t.id}')">Install</button>
+                 <a href="${t.url}" target="_blank" class="btn btn-xs" style="margin-left:4px">Docs</a>
                  <code class="code-tool-hint">${t.installHint}</code>
+                 <pre id="code-install-out-${t.id}" class="install-out" style="display:none"></pre>
                </div>`
           }
         </div>
@@ -134,6 +138,45 @@ async function codeConfigSave(id) {
     input.style.borderColor = 'var(--green)';
     setTimeout(() => { input.style.borderColor = ''; }, 1500);
   } catch (e) { alert(`Save error: ${e.message}`); }
+}
+
+function codeConfigEdit(id) {
+  const input = document.getElementById(`code-cfg-${id}`);
+  const p = input?.value?.trim();
+  if (!p) { showModal('Enter a config file path first.'); return; }
+  nav('files');
+  setTimeout(() => {
+    const dir = p.lastIndexOf('/') > 0 ? p.substring(0, p.lastIndexOf('/')) : '/';
+    fmNavigate(dir);
+    setTimeout(() => fmOpenEditor(p), 400);
+  }, 200);
+}
+
+async function codeToolInstall(id) {
+  const out = document.getElementById(`code-install-out-${id}`);
+  if (out) { out.style.display = 'block'; out.textContent = ''; }
+
+  try {
+    const res = await fetch(`/api/code/tools/${id}/install`, { method: 'POST' });
+    const reader  = res.body.getReader();
+    const decoder = new TextDecoder();
+    const read = async () => {
+      const { done, value } = await reader.read();
+      if (done) return;
+      decoder.decode(value).split('\n').forEach(line => {
+        if (!line.startsWith('data: ')) return;
+        try {
+          const obj = JSON.parse(line.slice(6));
+          if (obj.status && out) { out.textContent += obj.status; out.scrollTop = out.scrollHeight; }
+          if (obj.done && obj.ok) setTimeout(codeRefresh, 1200);
+        } catch {}
+      });
+      await read();
+    };
+    await read();
+  } catch (e) {
+    if (out) out.textContent += `\nError: ${e.message}`;
+  }
 }
 
 /* ── Per-tool embedded terminal ──────────────────────── */

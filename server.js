@@ -902,6 +902,43 @@ app.post('/api/code/tools/:id/config', (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+app.post('/api/code/tools/:id/install', (req, res) => {
+  const tool = CODE_TOOLS.find(t => t.id === req.params.id);
+  if (!tool) return res.status(404).json({ error: 'Unknown tool' });
+
+  sseHeaders(res);
+  const sseWrite = d => { try { res.write(`data: ${JSON.stringify(d)}\n\n`); } catch {} };
+
+  sseWrite({ status: `Installing ${tool.label}…\n$ ${tool.installHint}\n` });
+
+  const child = spawn('bash', ['-lc', tool.installHint], {
+    cwd: process.env.HOME || os.homedir(),
+    env: {
+      ...process.env,
+      HOME: process.env.HOME || os.homedir(),
+      DEBIAN_FRONTEND: 'noninteractive',
+      PATH: `${process.env.HOME || os.homedir()}/.local/bin:${process.env.PATH || '/usr/local/bin:/usr/bin:/bin'}`,
+    },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+
+  child.stdout.on('data', d => sseWrite({ status: d.toString() }));
+  child.stderr.on('data', d => sseWrite({ status: d.toString() }));
+  child.on('close', (code, signal) => {
+    const ok  = code === 0;
+    const msg = ok            ? '✓ Done'
+      : code !== null         ? `✗ Exit ${code}`
+      : `✗ Killed by signal (${signal || 'unknown'})`;
+    sseWrite({ done: true, ok, status: msg });
+    res.end();
+  });
+  child.on('error', e => {
+    sseWrite({ done: true, ok: false, status: `Error: ${e.message}` });
+    res.end();
+  });
+  res.on('close', () => { if (!child.killed) child.kill(); });
+});
+
 // ─── CLAUDE CODE ──────────────────────────────────────────────────────────────
 
 let claudeProc = null;
@@ -1640,7 +1677,7 @@ app.post('/api/system/tools/install', (req, res) => {
     sseWrite({ done: true, ok: false, status: `Error: ${e.message}` });
     res.end();
   });
-  req.on('close', () => child.kill());
+  res.on('close', () => { if (!child.killed) child.kill(); });
 });
 
 // ─── Local Non-LLM Models ─────────────────────────────────────────────────────

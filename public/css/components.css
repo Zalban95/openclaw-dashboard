@@ -487,6 +487,13 @@
   font-size: 9px; color: var(--muted);
   display: block; margin-top: 4px; width: 100%;
 }
+.install-out {
+  width: 100%; margin: 6px 0 0; padding: 8px;
+  background: var(--bg); border: 1px solid var(--border2);
+  border-radius: 4px; font-size: 10px; font-family: monospace;
+  color: var(--text); white-space: pre-wrap; max-height: 160px;
+  overflow-y: auto;
+}
 
 /* Claude history */
 .claude-hist-item {
