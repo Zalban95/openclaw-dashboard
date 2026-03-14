@@ -1779,7 +1779,21 @@ app.post('/api/models/local/delete', (req, res) => {
 // ─── WebSocket Terminal ───────────────────────────────────────────────────────
 
 const httpServer = http.createServer(app);
-const termWss    = new WebSocketServer({ server: httpServer, path: '/ws/terminal', perMessageDeflate: false });
+const termWss    = new WebSocketServer({ noServer: true });
+const codeWss    = new WebSocketServer({ noServer: true });
+
+// Route WebSocket upgrades manually so we can strip the permessage-deflate
+// extension header before the handshake — prevents RSV1 frame errors with ws@8.
+httpServer.on('upgrade', (req, socket, head) => {
+  delete req.headers['sec-websocket-extensions'];
+  if (req.url === '/ws/terminal') {
+    termWss.handleUpgrade(req, socket, head, ws => termWss.emit('connection', ws, req));
+  } else if (req.url === '/ws/code') {
+    codeWss.handleUpgrade(req, socket, head, ws => codeWss.emit('connection', ws, req));
+  } else {
+    socket.destroy();
+  }
+});
 
 termWss.on('connection', (ws) => {
   if (!pty) {
@@ -1827,8 +1841,6 @@ termWss.on('connection', (ws) => {
 });
 
 // ─── WebSocket Code Terminals (one per tool, bare shell + launch button) ──────
-
-const codeWss = new WebSocketServer({ server: httpServer, path: '/ws/code', perMessageDeflate: false });
 
 codeWss.on('connection', (ws, req) => {
   if (!pty) {
