@@ -89,16 +89,11 @@
     </div>
 
     <!-- HuggingFace cached models -->
-    <div class="sidebar-section">
+    <div class="sidebar-section grow">
       <div class="sec-label">HuggingFace Models</div>
       <div id="s-hf-models"><div class="placeholder">Loading…</div></div>
     </div>
 
-    <!-- Local Non-LLM models -->
-    <div class="sidebar-section grow">
-      <div class="sec-label">Local AI Models</div>
-      <div id="s-nlm-models"><div class="placeholder">Loading…</div></div>
-    </div>
 
   </aside>
 
@@ -604,73 +599,6 @@
         </div>
       </div>
 
-      <!-- Local Non-LLM Models -->
-      <div class="card">
-        <div class="card-title">Local Non-LLM Models</div>
-        <!-- Settings row -->
-        <div class="models-settings-grid" id="nlm-settings-grid">
-          <span class="models-settings-label">Tool</span>
-          <select id="nlm-tool" class="input" title="Select tool" aria-label="Tool" onchange="nlmLoadSettings(); nlmLoadList()">
-            <option value="whisper">Whisper (STT)</option>
-            <option value="kokoro">Kokoro TTS</option>
-            <option value="stable-diffusion">Stable Diffusion</option>
-            <option value="comfyui">ComfyUI</option>
-          </select>
-          <span class="models-settings-label">Models path</span>
-          <div style="display:flex;gap:6px;align-items:center">
-            <input id="nlm-path" class="input" style="flex:1;min-width:0" placeholder="/path/to/models (optional)">
-            <button class="btn btn-xs" title="Browse" onclick="fpOpen('nlm-path','dir')">📁</button>
-          </div>
-          <span class="models-settings-label">API URL</span>
-          <input id="nlm-apiurl" class="input" placeholder="http://127.0.0.1:7860 (optional)">
-          <span class="models-settings-label">Config file</span>
-          <div style="display:flex;gap:6px;align-items:center">
-            <input id="nlm-config-path" class="input" style="flex:1;min-width:0" placeholder="/path/to/config (optional)">
-            <button class="btn btn-xs" title="Browse" onclick="fpOpen('nlm-config-path','file')">📁</button>
-            <button class="btn btn-xs" title="Edit" onclick="nlmConfigEdit()">✎</button>
-          </div>
-        </div>
-        <div style="margin-top:10px;display:flex;align-items:center;gap:10px">
-          <button class="btn btn-sm btn-blue" onclick="nlmSaveSettings()">Save</button>
-          <button class="btn btn-sm" onclick="nlmLoadList()">↺ Refresh</button>
-          <span id="nlm-settings-status" class="status-line"></span>
-        </div>
-        <!-- Search online -->
-        <div class="models-search-row" style="margin-top:14px">
-          <input id="nlm-search-input" class="input" placeholder="Search available models…"
-                 style="flex:1" onkeydown="if(event.key==='Enter') nlmSearch()">
-          <button class="btn btn-sm" onclick="nlmSearch()">🔍 Search</button>
-        </div>
-        <div id="nlm-search-results" style="display:none;margin-bottom:8px"></div>
-        <!-- Install row -->
-        <div class="models-pull-row">
-          <input id="nlm-install-input" class="input" placeholder="model name / variant"
-                 style="max-width:300px"
-                 onkeydown="if(event.key==='Enter') nlmInstall()">
-          <button class="btn btn-sm btn-teal" onclick="nlmInstall()">⬇ Install</button>
-          <div class="models-pull-progress" id="nlm-pull-bar" style="display:none">
-            <div class="models-pull-progress-bar" id="nlm-pull-bar-fill"></div>
-          </div>
-          <span class="models-pull-pct" id="nlm-pull-pct"></span>
-        </div>
-        <div id="nlm-install-out" class="terminal" style="display:none;max-height:140px;margin-top:6px"></div>
-        <!-- Table -->
-        <div style="overflow-x:auto;margin-top:10px">
-          <table class="models-table">
-            <thead>
-              <tr>
-                <th>Model</th>
-                <th>Description</th>
-                <th>Status</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody id="nlm-table-body">
-              <tr><td colspan="4" class="placeholder" style="padding:12px">Loading…</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
 
     </div>
 

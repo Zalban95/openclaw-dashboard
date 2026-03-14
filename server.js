@@ -170,23 +170,7 @@ app.get('/api/status', async (req, res) => {
     }
   } catch {}
 
-  // NLM (Non-LLM) detected models — scan each tool's modelsPath for model files
-  let nlmModels = [];
-  try {
-    const localPrefs = mp.local || {};
-    for (const [toolId, def] of Object.entries(LOCAL_NLM_TOOLS)) {
-      const dir = localPrefs[toolId]?.modelsPath || '';
-      if (!dir || !fs.existsSync(dir)) continue;
-      try {
-        fs.readdirSync(dir).forEach(f => {
-          if (NLM_MODEL_EXTS.has(path.extname(f).toLowerCase()))
-            nlmModels.push({ tool: def.label || toolId, name: f });
-        });
-      } catch {}
-    }
-  } catch {}
-
-  res.json({ containers, gpu, system, models, loadedModels, hfModels, nlmModels, time: new Date().toISOString() });
+  res.json({ containers, gpu, system, models, loadedModels, hfModels, time: new Date().toISOString() });
 });
 
 // ─── ACTIONS ─────────────────────────────────────────────────────────────────
