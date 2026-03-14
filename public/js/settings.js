@@ -17,28 +17,13 @@ const SETTINGS_TABS = [
   { id: 'docker',    label: 'Docker' },
 ];
 
-const QUICK_NAV_ITEMS = [
-  { id: 'controls',      label: 'Controls' },
-  { id: 'openclaw-json', label: 'openclaw.json' },
-  { id: 'soul-md',       label: 'SOUL.md' },
-  { id: 'compose',       label: 'docker-compose.yml' },
-  { id: 'openclaw-dir',  label: '.openclaw/' },
-  { id: 'logs',          label: 'Logs' },
-  { id: 'keys',          label: 'API Keys' },
-  { id: 'snapshots',     label: 'Snapshots' },
-  { id: 'code',          label: 'Code Tools' },
-];
-
-let _settingsHidden  = [];
-let _quickNavHidden  = [];
+let _settingsHidden = [];
 
 async function settingsInit() {
   try {
     const prefs = await apiFetch('/api/prefs');
-    _settingsHidden = prefs.hiddenTabs  || [];
-    _quickNavHidden = prefs.quickNavHidden || [];
+    _settingsHidden = prefs.hiddenTabs || [];
     _settingsRender();
-    _settingsQNavRender();
   } catch (e) {
     const el = document.getElementById('settings-tabs-list');
     if (el) el.innerHTML = `<div class="placeholder" style="color:var(--red)">${e.message}</div>`;
@@ -61,59 +46,17 @@ function _settingsRender() {
   `).join('');
 }
 
-function _settingsQNavRender() {
-  const list = document.getElementById('settings-qnav-list');
-  if (!list) return;
-  list.innerHTML = QUICK_NAV_ITEMS.map(t => `
-    <div class="settings-tab-row">
-      <label class="skill-toggle">
-        <input type="checkbox" id="settings-qnav-${t.id}"
-               ${!_quickNavHidden.includes(t.id) ? 'checked' : ''}
-               onchange="settingsQNavToggleChange('${t.id}', this.checked)">
-        <span class="skill-toggle-track"></span>
-      </label>
-      <span class="settings-tab-label">${t.label}</span>
-    </div>
-  `).join('');
-}
-
-async function settingsQNavToggleChange(id, visible) {
-  if (visible) {
-    _quickNavHidden = _quickNavHidden.filter(i => i !== id);
-  } else {
-    if (!_quickNavHidden.includes(id)) _quickNavHidden.push(id);
-  }
-  _applyQuickNav(_quickNavHidden);
-  try {
-    await apiFetch('/api/prefs', { method: 'POST', body: { quickNavHidden: _quickNavHidden } });
-  } catch {}
-  // Sync the Settings save-button state
-  const cb = document.getElementById(`settings-qnav-${id}`);
-  if (cb) cb.checked = visible;
-}
-
-function _applyQuickNav(hidden) {
-  document.querySelectorAll('.quicklink[data-qnav]').forEach(btn => {
-    btn.style.display = hidden.includes(btn.dataset.qnav) ? 'none' : '';
-  });
-}
-
 async function settingsSave() {
   const status = document.getElementById('settings-status');
   const hiddenTabs = SETTINGS_TABS
     .filter(t => !document.getElementById(`settings-show-${t.id}`)?.checked)
     .map(t => t.id);
-  const quickNavHidden = QUICK_NAV_ITEMS
-    .filter(t => !document.getElementById(`settings-qnav-${t.id}`)?.checked)
-    .map(t => t.id);
 
   try {
-    await apiFetch('/api/prefs', { method: 'POST', body: { hiddenTabs, quickNavHidden } });
+    await apiFetch('/api/prefs', { method: 'POST', body: { hiddenTabs } });
     setStatus(status, '✓ Saved', 'ok');
     _settingsHidden = hiddenTabs;
-    _quickNavHidden = quickNavHidden;
     _applyHiddenTabs(hiddenTabs);
-    _applyQuickNav(quickNavHidden);
     _sidebarTabTogglesRender();
   } catch (e) {
     setStatus(status, `✗ ${e.message}`, 'err');
@@ -128,14 +71,12 @@ function _applyHiddenTabs(hiddenTabs) {
   });
 }
 
-/* Called on app startup to apply persisted hidden tabs and quick nav */
+/* Called on app startup to apply persisted hidden tabs */
 async function settingsApplyOnLoad() {
   try {
     const prefs = await apiFetch('/api/prefs');
-    _settingsHidden = prefs.hiddenTabs     || [];
-    _quickNavHidden = prefs.quickNavHidden || [];
+    _settingsHidden = prefs.hiddenTabs || [];
     _applyHiddenTabs(_settingsHidden);
-    _applyQuickNav(_quickNavHidden);
   } catch {}
 }
 
@@ -173,6 +114,7 @@ const SYSDEP_CATEGORY_LABEL = { required: 'Required', recommended: 'Recommended'
 const SYSDEP_CATEGORY_COLOR = { required: 'var(--red)', recommended: 'var(--amber)', optional: 'var(--muted)' };
 
 let _sysdepsInstalling = null; // tool id currently installing
+let _sysdepsTools      = [];   // cached list from last fetch (used by sysdepsInstall)
 
 async function sysdepsLoad() {
   const list   = document.getElementById('sysdeps-list');
@@ -182,7 +124,8 @@ async function sysdepsLoad() {
   if (btn) btn.disabled = true;
   try {
     const data  = await apiFetch('/api/system/tools');
-    _sysdepsRender(data.tools || []);
+    _sysdepsTools = data.tools || [];
+    _sysdepsRender(_sysdepsTools);
   } catch (e) {
     list.innerHTML = `<div class="placeholder" style="color:var(--red)">${e.message}</div>`;
   } finally {
@@ -234,20 +177,36 @@ function _sysdepsRender(tools) {
   list.innerHTML = html;
 }
 
-async function sysdepsInstall(id) {
+function sysdepsInstall(id) {
+  const tool = _sysdepsTools.find(t => t.id === id);
+  const needsSudo = tool && typeof tool.installCmd === 'string' && tool.installCmd.includes('sudo ');
+
+  if (needsSudo) {
+    sudoAsk(`Installing "${tool.label}" requires elevated privileges.`, pw => {
+      if (pw === null) return; // user cancelled
+      _sysdepsRunInstall(id, pw);
+    });
+  } else {
+    _sysdepsRunInstall(id, null);
+  }
+}
+
+async function _sysdepsRunInstall(id, password) {
   _sysdepsInstalling = id;
-  _sysdepsRender([]); // will reload below — optimistically mark as installing via a targeted update
-  // Re-fetch to get full list then re-render with installing flag
-  try { const d = await apiFetch('/api/system/tools'); _sysdepsRender(d.tools || []); } catch {}
+  // Re-render with installing flag using cached tools list
+  if (_sysdepsTools.length) _sysdepsRender(_sysdepsTools);
 
   const out = document.getElementById('sysdeps-out');
   if (out) { out.style.display = 'block'; out.textContent = `Installing ${id}…\n`; }
 
   try {
+    const body = { id };
+    if (password !== null && password !== undefined) body.password = password;
+
     const res = await fetch('/api/system/tools/install', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id })
+      body: JSON.stringify(body)
     });
     const reader  = res.body.getReader();
     const decoder = new TextDecoder();
@@ -261,7 +220,6 @@ async function sysdepsInstall(id) {
           if (obj.status && out) { out.textContent += obj.status; out.scrollTop = out.scrollHeight; }
           if (obj.done) {
             _sysdepsInstalling = null;
-            // Re-check all tools after install
             setTimeout(sysdepsLoad, 800);
           }
         } catch {}

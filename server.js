@@ -1597,19 +1597,32 @@ app.get('/api/system/tools', async (req, res) => {
 });
 
 app.post('/api/system/tools/install', (req, res) => {
-  const { id } = req.body;
-  const tool   = SYSTEM_TOOLS.find(t => t.id === id);
+  const { id, password } = req.body;
+  const tool = SYSTEM_TOOLS.find(t => t.id === id);
   if (!tool || !tool.installCmd) return res.status(400).json({ error: 'No install command for this tool' });
 
   sseHeaders(res);
   const sseWrite = d => res.write(`data: ${JSON.stringify(d)}\n\n`);
 
+  // If the command contains sudo and a password was supplied, rewrite it to use sudo -S
+  // so we can feed the password through stdin without a TTY.
+  let cmd = tool.installCmd;
+  const needsSudo = cmd.includes('sudo ') && typeof password === 'string' && password.length > 0;
+  if (needsSudo) cmd = cmd.replace(/\bsudo\b/g, 'sudo -S');
+
   sseWrite({ status: `Installing ${tool.label}…\n$ ${tool.installCmd}` });
 
-  const child = spawn('bash', ['-lc', tool.installCmd], {
-    cwd:  tool.installCwd || (process.env.HOME || WORKSPACE_DIR),
-    env:  { ...process.env, HOME: process.env.HOME || os.homedir(), DEBIAN_FRONTEND: 'noninteractive' },
+  const child = spawn('bash', ['-lc', cmd], {
+    cwd:   tool.installCwd || (process.env.HOME || WORKSPACE_DIR),
+    env:   { ...process.env, HOME: process.env.HOME || os.homedir(), DEBIAN_FRONTEND: 'noninteractive' },
+    stdio: ['pipe', 'pipe', 'pipe'],
   });
+
+  // Feed password to sudo via stdin then close it
+  if (needsSudo) {
+    child.stdin.write(password + '\n');
+  }
+  child.stdin.end();
 
   child.stdout.on('data', d => sseWrite({ status: d.toString() }));
   child.stderr.on('data', d => sseWrite({ status: d.toString() }));
