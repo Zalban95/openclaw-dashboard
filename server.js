@@ -1855,15 +1855,18 @@ app.post('/api/models/hf/settings', (req, res) => {
 });
 
 app.get('/api/models/hf/status', (req, res) => {
-  const mp       = loadModelsPrefs();
-  const home     = process.env.HOME || os.homedir();
-  const hfBin    = `PATH="${home}/.local/bin:${process.env.PATH}" huggingface-cli`;
-  const env      = { ...process.env, HOME: home,
-                     ...(mp.hf?.token ? { HF_TOKEN: mp.hf.token } : {}) };
-  exec(`bash -lc "${hfBin} version 2>/dev/null"`, { env, timeout: 5000 }, (err, stdout) => {
+  const mp   = loadModelsPrefs();
+  const home = process.env.HOME || os.homedir();
+  const env  = { ...process.env, HOME: home,
+                 PATH: `${home}/.local/bin:/usr/local/bin:${process.env.PATH || '/usr/bin:/bin'}`,
+                 ...(mp.hf?.token ? { HF_TOKEN: mp.hf.token } : {}) };
+
+  // Same detection strategy as SYSTEM_TOOLS: try --version, fall back to python import
+  const detectCmd = `huggingface-cli --version 2>/dev/null || python3 -c "import huggingface_hub; print(huggingface_hub.__version__)" 2>/dev/null`;
+  exec(`bash -lc "${detectCmd}"`, { env, timeout: 5000 }, (err, stdout) => {
     const version = stdout.trim().split('\n')[0] || null;
     if (err || !version) return res.json({ detected: false, version: null, user: null });
-    exec(`bash -lc "${hfBin} whoami 2>/dev/null"`, { env, timeout: 5000 }, (e2, out2) => {
+    exec(`bash -lc "huggingface-cli whoami 2>/dev/null"`, { env, timeout: 5000 }, (e2, out2) => {
       const user = e2 ? null : (out2.trim().split('\n')[0] || null);
       res.json({ detected: true, version, user });
     });
@@ -1871,13 +1874,13 @@ app.get('/api/models/hf/status', (req, res) => {
 });
 
 app.get('/api/models/hf/list', (req, res) => {
-  const mp    = loadModelsPrefs();
-  const home  = process.env.HOME || os.homedir();
-  const hfBin = `PATH="${home}/.local/bin:${process.env.PATH}" huggingface-cli`;
-  const env   = { ...process.env, HOME: home,
-                  ...(mp.hf?.token ? { HF_TOKEN: mp.hf.token } : {}) };
+  const mp   = loadModelsPrefs();
+  const home = process.env.HOME || os.homedir();
+  const env  = { ...process.env, HOME: home,
+                 PATH: `${home}/.local/bin:/usr/local/bin:${process.env.PATH || '/usr/bin:/bin'}`,
+                 ...(mp.hf?.token ? { HF_TOKEN: mp.hf.token } : {}) };
 
-  exec(`bash -lc "${hfBin} scan-cache --json 2>/dev/null"`, { env, timeout: 10000, maxBuffer: 5 * 1024 * 1024 }, (err, stdout) => {
+  exec(`bash -lc "huggingface-cli scan-cache --json 2>/dev/null"`, { env, timeout: 10000, maxBuffer: 5 * 1024 * 1024 }, (err, stdout) => {
     if (!err && stdout.trim()) {
       try {
         const data  = JSON.parse(stdout.trim());
@@ -1948,9 +1951,11 @@ app.post('/api/models/hf/download', (req, res) => {
   const cmdStr = `huggingface-cli ${args.join(' ')}`;
   sseWrite({ status: `Downloading ${repoId}…\n$ ${cmdStr}\n` });
 
-  const child = spawn('bash', ['-lc', `PATH="${home}/.local/bin:$PATH" ${cmdStr}`], {
+  const child = spawn('bash', ['-lc', cmdStr], {
     cwd: home,
-    env: { ...process.env, HOME: home, ...(token ? { HF_TOKEN: token } : {}) },
+    env: { ...process.env, HOME: home,
+           PATH: `${home}/.local/bin:/usr/local/bin:${process.env.PATH || '/usr/bin:/bin'}`,
+           ...(token ? { HF_TOKEN: token } : {}) },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
 
