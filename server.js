@@ -171,7 +171,6 @@ app.get('/api/status', async (req, res) => {
   } catch {}
 
   // NLM (Non-LLM) detected models — scan each tool's modelsPath for model files
-  const NLM_MODEL_EXTS = new Set(['.pt', '.safetensors', '.ckpt', '.bin', '.gguf', '.onnx', '.pth']);
   let nlmModels = [];
   try {
     const localPrefs = mp.local || {};
@@ -1647,7 +1646,7 @@ const SYSTEM_TOOLS = [
     id: 'huggingface-cli',
     label: 'huggingface-cli',
     category: 'optional',
-    detectCmd: 'PATH="$HOME/.local/bin:$PATH" huggingface-cli --version 2>/dev/null || python3 -c "import huggingface_hub; print(huggingface_hub.__version__)" 2>/dev/null',
+      detectCmd: 'python3 -c "import huggingface_hub; print(huggingface_hub.__version__)" 2>/dev/null || PATH="$HOME/.local/bin:$PATH" huggingface-cli --version 2>/dev/null',
     note: 'HuggingFace Hub CLI — for downloading local models',
     repo: 'https://pypi.org/project/huggingface-hub/',
     repoLabel: 'pip: huggingface-hub',
@@ -1732,6 +1731,8 @@ app.post('/api/system/tools/install', (req, res) => {
 
 // ─── Local Non-LLM Models ─────────────────────────────────────────────────────
 
+const NLM_MODEL_EXTS = new Set(['.pt', '.safetensors', '.ckpt', '.bin', '.gguf', '.onnx', '.pth']);
+
 const LOCAL_NLM_TOOLS = {
   whisper: {
     label: 'Whisper (STT)',
@@ -1815,11 +1816,27 @@ app.get('/api/models/local/list', (req, res) => {
   const def  = LOCAL_NLM_TOOLS[tool];
   if (!def) return res.json({ models: [] });
 
+  // Combine the known model list (with detectFile checks) with a filesystem scan
+  // so that models installed outside the known list are also shown.
+  const known = new Set();
   const models = def.models.map(m => {
     const filePath = def.detectFile(dir, m.name);
     const detected = filePath ? fs.existsSync(filePath) : false;
+    if (detected) known.add(m.name);
     return { name: m.name, description: m.description, detected, path: filePath || '' };
   });
+
+  // Filesystem scan: surface any model file in modelsPath not already in known list
+  if (dir && fs.existsSync(dir)) {
+    try {
+      fs.readdirSync(dir).forEach(f => {
+        if (!NLM_MODEL_EXTS.has(path.extname(f).toLowerCase())) return;
+        if (known.has(f)) return;
+        models.push({ name: f, description: 'Detected on disk', detected: true, path: path.join(dir, f) });
+      });
+    } catch {}
+  }
+
   res.json({ models });
 });
 
@@ -1901,11 +1918,15 @@ app.get('/api/models/hf/status', (req, res) => {
                  ...(mp.hf?.token ? { HF_TOKEN: mp.hf.token } : {}) };
 
   // Same detection strategy as SYSTEM_TOOLS: try --version, fall back to python import
-  const detectCmd = `huggingface-cli --version 2>/dev/null || python3 -c "import huggingface_hub; print(huggingface_hub.__version__)" 2>/dev/null`;
+  // Python import is the primary check — the CLI binary may not be in PATH even when
+  // the package is installed (e.g. sudo pip install without user profile reload).
+  const detectCmd = `python3 -c "import huggingface_hub; print(huggingface_hub.__version__)" 2>/dev/null || huggingface-cli --version 2>/dev/null`;
   exec(`bash -lc "${detectCmd.replace(/"/g, '\\"')}"`, { env, timeout: 5000 }, (err, stdout) => {
     const version = stdout.trim().split('\n')[0] || null;
     if (err || !version) return res.json({ detected: false, version: null, user: null });
-    exec(`bash -lc "huggingface-cli whoami 2>/dev/null"`, { env, timeout: 5000 }, (e2, out2) => {
+    // whoami via Python as well (huggingface-cli whoami fails when binary not in PATH)
+    const whoamiCmd = `python3 -c "import sys; sys.argv=['hf','whoami']; from huggingface_hub.commands.huggingface_cli import main; main()" 2>/dev/null || huggingface-cli whoami 2>/dev/null`;
+    exec(`bash -lc "${whoamiCmd.replace(/"/g, '\\"')}"`, { env, timeout: 5000 }, (e2, out2) => {
       const user = e2 ? null : (out2.trim().split('\n')[0] || null);
       res.json({ detected: true, version, user });
     });
@@ -1983,17 +2004,20 @@ app.post('/api/models/hf/download', (req, res) => {
   sseHeaders(res);
   const sseWrite = d => { try { res.write(`data: ${JSON.stringify(d)}\n\n`); } catch {} };
 
-  const args = ['download', repoId];
-  if (token)  args.push('--token', token);
-  if (cache)  args.push('--cache-dir', cache);
+  // Build Python invocation — avoids relying on huggingface-cli binary being in PATH.
+  // The huggingface_hub *package* is always reachable via python3 even when the CLI
+  // entry-point script is missing from $PATH.
+  const dlArgs = ['download', repoId];
+  if (token) dlArgs.push('--token', token);
+  if (cache) dlArgs.push('--cache-dir', cache);
+  const argList = dlArgs.map(a => JSON.stringify(a)).join(', ');
+  const pyScript = `import sys; sys.argv = ['hf', ${argList}]; from huggingface_hub.commands.huggingface_cli import main; main()`;
+  const cmdStr   = `python3 -c "${pyScript.replace(/"/g, '\\"')}"`;
 
-  const hfPath = `${home}/.local/bin:/usr/local/bin:/usr/bin:/bin`;
-  const cmdStr = `huggingface-cli ${args.join(' ')}`;
-  sseWrite({ status: `Downloading ${repoId}…\n$ ${cmdStr}\n` });
+  sseWrite({ status: `Downloading ${repoId}…\n$ huggingface-cli ${dlArgs.join(' ')}\n` });
 
-  // Use bash -c (no login flag) and embed PATH in the command itself so that
-  // login-profile scripts (.profile, .bashrc) cannot override our PATH.
-  const child = spawn('bash', ['-c', `PATH="${hfPath}:$PATH" ${cmdStr}`], {
+  const hfPath = `/usr/bin:/usr/local/bin:${home}/.local/bin:/bin`;
+  const child  = spawn('bash', ['-c', cmdStr], {
     cwd: home,
     env: { ...process.env, HOME: home,
            PATH: `${hfPath}:${process.env.PATH || ''}`,
