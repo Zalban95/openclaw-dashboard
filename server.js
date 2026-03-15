@@ -2332,6 +2332,10 @@ app.post('/api/services/start', (req, res) => {
     dockerArgs.push(svc.image);
     dockerArgs.push('--listen', '--api');
   } else if (id === 'comfyui') {
+    // mmartial/comfyui-nvidia-docker expects /comfy/mnt as writable workspace
+    const comfyDir = path.join(home, 'comfyui-data');
+    try { if (!fs.existsSync(comfyDir)) fs.mkdirSync(comfyDir, { recursive: true }); } catch {}
+    dockerArgs.push('-v', `${comfyDir}:/comfy/mnt`);
     dockerArgs.push('-v', `${hfCache}:/root/.cache/huggingface`);
     dockerArgs.push(svc.image);
   } else {
