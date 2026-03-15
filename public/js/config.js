@@ -2,23 +2,10 @@
    OPENCLAW PANEL — CONFIG  (multi-file editor + editable favorites)
    ═══════════════════════════════════════════════════════ */
 
-/* ── File registry ───────────────────────────────────────
-   Groups: favorites · core · providers · system
+/* ── File registry (populated at init from /api/paths) ──
+   Groups: favorites · config · custom
 ──────────────────────────────────────────────────────── */
-const CONFIG_FILES = [
-  { group: 'favorites', id: 'openclaw',  label: 'openclaw.json',       path: '/home/al/.openclaw/openclaw.json',      type: 'json', description: 'Main OpenClaw config — models, providers, tools' },
-  { group: 'favorites', id: 'soul',      label: 'SOUL.md',             path: '/home/al/.openclaw/SOUL.md',            type: 'text', description: "Bob's rules and personality definition" },
-  { group: 'favorites', id: 'compose',   label: 'docker-compose.yml',  path: '/home/al/openclaw/docker-compose.yml',  type: 'text', description: 'Docker Compose stack definition' },
-
-  { group: 'config', id: 'aider',           label: '.aider.conf.yml',      path: '/home/al/.aider.conf.yml',              type: 'text', description: 'Aider defaults — model, API key, flags' },
-  { group: 'config', id: 'env',             label: '.env',                 path: '/home/al/openclaw/.env',                type: 'env',  description: 'Docker env overrides for the stack' },
-  { group: 'config', id: 'modelfile-qwen',  label: 'Modelfile.qwen-coder', path: '/home/al/.ollama/Modelfile.qwen-coder-gpu', type: 'text', description: 'Ollama Modelfile for qwen-coder-gpu' },
-  { group: 'config', id: 'modelfile-qwen3', label: 'Modelfile.qwen3',      path: '/home/al/.ollama/Modelfile.qwen3',     type: 'text', description: 'Ollama Modelfile for qwen3:30b' },
-
-  { group: 'custom', id: 'setup',    label: 'setup-openclaw.sh',  path: '/home/al/setup-openclaw.sh',  type: 'sh', description: 'Initial setup script' },
-  { group: 'custom', id: 'snapshot', label: 'snapshot-agent.sh',  path: '/home/al/snapshot-agent.sh',  type: 'sh', description: 'Agent snapshot script' },
-  { group: 'custom', id: 'restore',  label: 'restore-agent.sh',   path: '/home/al/restore-agent.sh',   type: 'sh', description: 'Agent restore script' }
-];
+let CONFIG_FILES = [];
 
 const GROUP_LABELS = {
   favorites: '★ Favorites',
@@ -54,7 +41,32 @@ function getAllConfigFiles() {
 }
 
 /* ── Init ────────────────────────────────────────────── */
+async function loadConfigPaths() {
+  try {
+    const p = await apiFetch('/api/paths');
+    const h = p.home || '/';
+    const reg = p.configRegistry || {};
+    CONFIG_FILES = [
+      { group: 'favorites', id: 'openclaw', label: 'openclaw.json',      path: reg.openclaw || h + '/.openclaw/openclaw.json',     type: 'json', description: 'Main OpenClaw config — models, providers, tools' },
+      { group: 'favorites', id: 'soul',     label: 'SOUL.md',            path: reg.soul     || h + '/.openclaw/SOUL.md',           type: 'text', description: 'Agent personality definition' },
+      { group: 'favorites', id: 'compose',  label: 'docker-compose.yml', path: reg.compose   || (p.composeDir || h + '/openclaw') + '/docker-compose.yml', type: 'text', description: 'Docker Compose stack definition' },
+
+      { group: 'config', id: 'aider',           label: '.aider.conf.yml',      path: reg.aider            || h + '/.aider.conf.yml',              type: 'text', description: 'Aider defaults — model, API key, flags' },
+      { group: 'config', id: 'env',             label: '.env',                 path: reg.env              || (p.composeDir || h + '/openclaw') + '/.env', type: 'env',  description: 'Docker env overrides for the stack' },
+      { group: 'config', id: 'modelfile-qwen',  label: 'Modelfile.qwen-coder', path: reg['modelfile-qwen']  || h + '/.ollama/Modelfile.qwen-coder-gpu', type: 'text', description: 'Ollama Modelfile for qwen-coder-gpu' },
+      { group: 'config', id: 'modelfile-qwen3', label: 'Modelfile.qwen3',      path: reg['modelfile-qwen3'] || h + '/.ollama/Modelfile.qwen3',     type: 'text', description: 'Ollama Modelfile for qwen3:30b' },
+
+      { group: 'custom', id: 'setup',    label: 'setup-openclaw.sh', path: reg.setup    || h + '/setup-openclaw.sh', type: 'sh', description: 'Initial setup script' },
+      { group: 'custom', id: 'snapshot', label: 'snapshot-agent.sh', path: reg.snapshot  || h + '/snapshot-agent.sh', type: 'sh', description: 'Agent snapshot script' },
+      { group: 'custom', id: 'restore',  label: 'restore-agent.sh',  path: reg.restore   || h + '/restore-agent.sh',  type: 'sh', description: 'Agent restore script' },
+    ];
+  } catch {
+    CONFIG_FILES = [];
+  }
+}
+
 async function initConfig() {
+  if (!CONFIG_FILES.length) await loadConfigPaths();
   await loadCustomFavorites();
   buildConfigSidebar();
   if (!cfgActive) cfgOpenFile('openclaw');

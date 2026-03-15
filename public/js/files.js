@@ -4,7 +4,7 @@
 
 /* ── State ───────────────────────────────────────────── */
 const fm = {
-  cwd:       '/home/al',
+  cwd:       '',
   entries:   [],
   selected:  new Set(),
   clipboard: null,
@@ -15,25 +15,35 @@ const fm = {
   favorites: [],
 };
 
-/* ── Bookmarks ───────────────────────────────────────── */
-const FM_BOOKMARKS = [
-  { id: 'home',      icon: '⌂', label: 'Home',          path: '/home/al' },
-  { id: 'openclaw',  icon: '⚙', label: '.openclaw',      path: '/home/al/.openclaw' },
-  { id: 'workspace', icon: '📁', label: 'Workspace',      path: '/home/al/.openclaw/workspace' },
-  { id: 'skills',    icon: '🔌', label: 'Skills',         path: '/home/al/.openclaw/workspace/skills' },
-  { id: 'compose',   icon: '🐳', label: 'Docker dir',     path: '/home/al/openclaw' },
-  { id: 'newvolume', icon: '💾', label: 'NewVolume',      path: '/media/al/NewVolume' },
-  { id: 'snapshots', icon: '📷', label: 'Snapshots',      path: '/media/al/NewVolume/openclaw-snapshots' },
-  { id: 'ollama',    icon: '🧠', label: 'Ollama models',  path: '/media/al/NewVolume/ollama-models' },
-  { id: 'scripts',   icon: '⚡', label: 'Scripts',        path: '/home/al' },
-  { id: 'root',      icon: '/', label: 'Root fs',         path: '/' },
-];
+/* ── Bookmarks (populated at init from /api/paths) ──── */
+let FM_BOOKMARKS = [];
 
 /* ── Init ────────────────────────────────────────────── */
 async function fmInit() {
   if (document.getElementById('fm-bookmarks-list').children.length > 0) {
     fmRefresh(); return;
   }
+
+  try {
+    const paths = await apiFetch('/api/paths');
+    const h = paths.home || '/';
+    fm.cwd = h;
+    FM_BOOKMARKS = [
+      { id: 'home',      icon: '⌂', label: 'Home',       path: h },
+      { id: 'openclaw',  icon: '⚙', label: '.openclaw',   path: h + '/.openclaw' },
+      { id: 'workspace', icon: '📁', label: 'Workspace',   path: paths.workspaceDir || h + '/.openclaw/workspace' },
+      { id: 'skills',    icon: '🔌', label: 'Skills',      path: paths.skillsDir    || h + '/.openclaw/workspace/skills' },
+      { id: 'compose',   icon: '🐳', label: 'Docker dir',  path: paths.composeDir   || h + '/openclaw' },
+      { id: 'snapshots', icon: '📷', label: 'Snapshots',   path: paths.snapshotDir  || '/tmp' },
+      { id: 'root',      icon: '/', label: 'Root fs',      path: '/' },
+    ];
+  } catch {
+    fm.cwd = '/';
+    FM_BOOKMARKS = [
+      { id: 'root', icon: '/', label: 'Root fs', path: '/' },
+    ];
+  }
+
   fmBuildBookmarks();
   fmSetupDragDrop();
   await fmLoadFavorites();

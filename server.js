@@ -55,6 +55,7 @@ app.get ('/api/config-favorites',  config.handleGetConfigFavorites);
 app.post('/api/config-favorites',  config.handlePostConfigFavorites);
 app.get ('/api/fm-favorites',      config.handleGetFmFavorites);
 app.post('/api/fm-favorites',      config.handlePostFmFavorites);
+app.get ('/api/paths',             config.handleGetPaths);
 
 // ─── Routes: API Keys & Tool Providers ────────────────────────────────────────
 app.get   ('/api/keys',                      keys.handleGetKeys);

@@ -3,7 +3,10 @@
 const fs   = require('fs');
 const path = require('path');
 
-const { CONFIG_PATH, CONFIG_REGISTRY, PREFS_FILE } = require('./paths');
+const {
+  HOME, COMPOSE_DIR, CONFIG_PATH, SKILLS_DIR, WORKSPACE_DIR,
+  SNAPSHOT_DIR, CONFIG_REGISTRY, PREFS_FILE,
+} = require('./paths');
 const { loadPrefs } = require('./utils');
 
 // ─── Multi-file config ────────────────────────────────────────────────────────
@@ -111,6 +114,21 @@ function handlePostFmFavorites(req, res) {
   } catch (e) { res.status(500).json({ error: e.message }); }
 }
 
+// ─── Server Paths (for frontend portability) ─────────────────────────────────
+
+/** GET /api/paths */
+function handleGetPaths(_req, res) {
+  res.json({
+    home:           HOME,
+    composeDir:     COMPOSE_DIR,
+    configPath:     CONFIG_PATH,
+    skillsDir:      SKILLS_DIR,
+    workspaceDir:   WORKSPACE_DIR,
+    snapshotDir:    SNAPSHOT_DIR,
+    configRegistry: CONFIG_REGISTRY,
+  });
+}
+
 module.exports = {
   handleGetConfig,
   handlePostConfig,
@@ -122,4 +140,5 @@ module.exports = {
   handlePostConfigFavorites,
   handleGetFmFavorites,
   handlePostFmFavorites,
+  handleGetPaths,
 };
