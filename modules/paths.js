@@ -13,7 +13,7 @@ const WORKSPACE_DIR   = process.env.WORKSPACE_DIR   || path.join(HOME, '.opencla
 const SETUP_DIR       = process.env.SETUP_DIR       || HOME;
 const SNAPSHOT_SCRIPT = process.env.SNAPSHOT_SCRIPT || path.join(HOME, 'snapshot-agent.sh');
 const RESTORE_SCRIPT  = process.env.RESTORE_SCRIPT  || path.join(HOME, 'restore-agent.sh');
-const SNAPSHOT_DIR    = process.env.SNAPSHOT_DIR    || '/media/al/NewVolume/openclaw-snapshots';
+const SNAPSHOT_DIR    = process.env.SNAPSHOT_DIR    || path.join(HOME, 'openclaw-snapshots');
 const PORT            = process.env.PORT            || 4242;
 
 // Prefs stored next to the server entry point

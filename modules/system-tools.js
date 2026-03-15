@@ -37,6 +37,13 @@ const SYSTEM_TOOLS = [
     installCmd: 'curl -fsSL https://get.docker.com | sh',
   },
   {
+    id: 'openclaw', label: 'OpenClaw', category: 'recommended',
+    detectCmd: 'test -f "$HOME/openclaw/docker-compose.yml" && cd "$HOME/openclaw" && git log -1 --format="rev %h (%cr)" 2>/dev/null',
+    note: 'OpenClaw AI stack — clone repo and start Docker Compose services',
+    repo: 'https://github.com/openclaw-ai/openclaw', repoLabel: 'openclaw-ai/openclaw',
+    installCmd: 'if [ -d "$HOME/openclaw" ]; then cd "$HOME/openclaw" && git pull; else git clone https://github.com/openclaw-ai/openclaw.git "$HOME/openclaw"; fi && cd "$HOME/openclaw" && docker compose up -d',
+  },
+  {
     id: 'git', label: 'Git', category: 'recommended',
     detectCmd: 'git --version 2>/dev/null',
     note: 'Version control — required for skills management',
